@@ -1,0 +1,363 @@
+/* ============================================================
+   QuickText Voice Pro - Styles Principaux
+   ============================================================ */
+
+:root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-card: rgba(255, 255, 255, 0.05);
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666;
+    --accent: #9b59b6;
+    --accent-light: #b07cc6;
+    --danger: #e74c3c;
+    --success: #27ae60;
+    --warning: #f39c12;
+    --border: rgba(255, 255, 255, 0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --transition: all 0.2s ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Header */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+}
+
+.app-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.app-title .accent {
+    color: var(--accent);
+}
+
+.install-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+}
+
+/* Main */
+.app-main {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Mode Indicator */
+.mode-indicator {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    background: var(--bg-card);
+    border-radius: 20px;
+    align-self: center;
+}
+
+/* Text Area */
+.text-area-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.text-area {
+    width: 100%;
+    flex: 1;
+    min-height: 250px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    line-height: 1.6;
+    resize: none;
+    font-family: inherit;
+}
+
+.text-area:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.2);
+}
+
+.text-area::placeholder {
+    color: var(--text-muted);
+}
+
+/* Progress Bar */
+.progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+    min-height: 44px;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-secondary {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.btn-accent {
+    background: linear-gradient(135deg, var(--accent), #7d3c98);
+    color: white;
+    font-weight: 600;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-sm {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    min-height: 36px;
+}
+
+.btn-icon {
+    margin-right: 4px;
+}
+
+.recording {
+    animation: recordingPulse 1.5s infinite;
+    background: var(--danger) !important;
+}
+
+@keyframes recordingPulse {
+    0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5); }
+    70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
+
+/* Toolbars */
+.toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.toolbar-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Controls */
+.controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.control-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.select-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.select-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* API Config */
+.api-config {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.api-config summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.api-config-content {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.api-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: monospace;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.api-info a {
+    color: var(--accent-light);
+    text-decoration: none;
+    font-size: 0.85rem;
+}
+
+/* Info Bar */
+.info-bar {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 8px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+/* Safe Area iPhone */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .app-header {
+        padding-top: calc(12px + env(safe-area-inset-top));
+    }
+    .app-main {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Responsive */
+@media (max-width: 360px) {
+    .toolbar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .app-main {
+        padding: 24px;
+    }
+    .text-area {
+        min-height: 300px;
+    }
+}

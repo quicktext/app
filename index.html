@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QuickText">
+    <meta name="description" content="QuickText Voice Pro - Transcription vocale, traduction et synthese IA">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon48.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    
+    <title>QuickText Voice Pro</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --bg-surface: #222240;
+            --bg-input: #1e1e38;
+            --bg-popup: #1c1c32;
+            --text: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #707080;
+            --accent: #9b59b6;
+            --accent-light: #b07cc6;
+            --accent-dark: #7d3c98;
+            --danger: #e74c3c;
+            --danger-light: #f07070;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --toast-bg: #b07cc6;
+            --border: rgba(255, 255, 255, 0.1);
+            --border-light: rgba(255, 255, 255, 0.06);
+            --radius: 10px;
+            --radius-sm: 6px;
+            --radius-lg: 14px;
+            --radius-xl: 18px;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .loading-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.4s;
+        }
+        
+        .loading-screen.hidden { opacity: 0; pointer-events: none; }
+        
+        .loading-spinner svg {
+            width: 44px; height: 44px;
+            animation: spin 0.7s linear infinite;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #app {
+            display: none;
+            flex-direction: column;
+            min-height: 100dvh;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 14px;
+        }
+        
+        /* ============================================================
+           POP-UP
+           ============================================================ */
+        .popup-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.65);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+        }
+        
+        .popup-dialog {
+            background: var(--bg-popup);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 24px 20px 20px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: popupIn 0.25s ease;
+            text-align: center;
+        }
+        
+        @keyframes popupIn {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .popup-icon {
+            width: 56px; height: 56px;
+            margin: 0 auto 14px;
+            background: rgba(155, 89, 182, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .popup-icon svg { width: 28px; height: 28px; }
+        
+        .popup-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+            letter-spacing: 0.2px;
+        }
+        
+        .popup-message {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            line-height: 1.4;
+            letter-spacing: 0.2px;
+        }
+        
+        .popup-input {
+            width: 100%;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.85rem;
+            font-family: inherit;
+            letter-spacing: 0.2px;
+            text-align: center;
+            transition: border-color 0.2s;
+        }
+        
+        .popup-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.15);
+        }
+        
+        .popup-input::placeholder { color: var(--text-muted); opacity: 0.7; }
+        
+        /* Toggle dans le pop-up */
+        .popup-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 8px 0;
+        }
+        
+        .popup-toggle-label {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            letter-spacing: 0.2px;
+        }
+        
+        .popup-toggle-switch {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 38px; height: 21px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 11px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s ease;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 0;
+        }
+        
+        .popup-toggle-switch::before {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 15px; height: 15px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .popup-toggle-switch:checked {
+            background: #9b59b6;
+            border-color: #9b59b6;
+        }
+        
+        .popup-toggle-switch:checked::before {
+            transform: translateX(17px);
+        }
+        
+        /* Options supplémentaires (logo, position, couleur) */
+        .popup-extra-options {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 14px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-light);
+        }
+        
+        .popup-extra-options.visible {
+            display: flex;
+        }
+        
+        .popup-option-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        
+        .popup-option-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            letter-spacing: 0.2px;
+        }
+        
+        .popup-file-input {
+            flex: 1;
+            padding: 6px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.7rem;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        
+        .popup-file-input::file-selector-button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-family: inherit;
+            margin-right: 8px;
+        }
+        
+        /* Sélecteur de position */
+        .popup-position-group {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .popup-position-btn {
+            flex: 1;
+            padding: 6px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+        
+        .popup-position-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .popup-position-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        
+        /* Palette de couleurs */
+        .popup-color-palette {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .popup-color-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        
+        .popup-color-swatch:hover {
+            transform: scale(1.15);
+        }
+        
+        .popup-color-swatch.active {
+            border-color: white;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+            transform: scale(1.15);
+        }
+        
+        /* Champ de saisie hexadécimal */
+        .popup-hex-input {
+            width: 80px;
+            padding: 6px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.8rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            text-align: center;
+            letter-spacing: 1px;
+            transition: border-color 0.2s;
+        }
+
+        .popup-hex-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.15);
+        }
+
+        .popup-hex-preview {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        
+        .popup-radio-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .popup-radio-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            letter-spacing: 0.2px;
+        }
+
+        .popup-radio-switch {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 38px; height: 21px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 11px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s ease;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 0;
+        }
+
+        .popup-radio-switch::before {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 15px; height: 15px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .popup-radio-switch:checked {
+            background: #9b59b6;
+            border-color: #9b59b6;
+        }
+
+        .popup-radio-switch:checked::before {
+            transform: translateX(17px);
+        }
+        /* Boutons */
+        .popup-buttons { display: flex; gap: 10px; }
+        
+        .popup-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            letter-spacing: 0.2px;
+        }
+        
+        .popup-btn:active { transform: scale(0.96); }
+        
+        .popup-btn-cancel {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .popup-btn-confirm {
+            background: var(--accent);
+            color: white;
+        }
+        
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0 8px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg);
+        }
+        
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+        
+        .header-logo {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        
+        .header-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        
+        .app-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
+        .app-title .accent { color: var(--accent-light); }
+        
+        .install-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 18px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 500;
+            font-family: inherit;
+            letter-spacing: 0.2px;
+        }
+        
+        .install-btn .install-icon { width: 16px; height: 16px; }
+        .install-btn .install-icon svg { width: 100%; height: 100%; }
+        
+        /* ============================================================
+           MODE INDICATOR
+           ============================================================ */
+        .mode-indicator {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            padding: 2px 12px;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        
+        /* ============================================================
+           TOOLBAR TOP
+           ============================================================ */
+        .toolbar-top { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+        
+        .btn-tool {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.73rem;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            min-height: 34px;
+            letter-spacing: 0.2px;
+        }
+        
+        .btn-tool:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.08); border-color: var(--accent); }
+        .btn-tool .tool-icon { width: 18px; height: 18px; flex-shrink: 0; }
+        .btn-tool .tool-icon svg { width: 100%; height: 100%; }
+        
+        .btn-tool-danger { background: rgba(231, 76, 60, 0.12); border-color: rgba(231, 76, 60, 0.2); color: #f08080; }
+        .btn-tool-danger:active { background: rgba(231, 76, 60, 0.22); }
+        
+        /* ============================================================
+           MENUS DEROULANTS
+           ============================================================ */
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-color: var(--bg-surface) !important;
+            color: var(--text) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius-sm) !important;
+            padding: 9px 28px 9px 12px !important;
+            font-size: 0.78rem !important;
+            font-family: inherit !important;
+            cursor: pointer !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%239b59b6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 10px center !important;
+            letter-spacing: 0.2px !important;
+        }
+        
+        select:focus { outline: none !important; border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.15) !important; }
+        
+        select option {
+            background-color: var(--bg) !important;
+            color: var(--text) !important;
+            padding: 10px 12px !important;
+            font-family: inherit !important;
+            font-size: 0.8rem !important;
+        }
+        
+        select option:hover, select option:focus, select option:active, select option:checked {
+            background-color: var(--bg-surface) !important;
+            color: var(--accent-light) !important;
+        }
+        
+        /* ============================================================
+           TEXTAREA
+           ============================================================ */
+        .text-area-container { flex: 1; display: flex; flex-direction: column; }
+        
+        .text-area {
+            width: 100%;
+            flex: 1;
+            min-height: 220px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            padding: 14px;
+            color: var(--text);
+            font-size: 0.88rem;
+            line-height: 1.65;
+            resize: none;
+            font-family: inherit;
+            letter-spacing: 0.2px;
+            transition: border-color 0.2s;
+        }
+        
+        .text-area:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.1); }
+        .text-area::placeholder { color: var(--text-muted); opacity: 0.7; }
+        
+        /* ============================================================
+           PROGRESS BAR
+           ============================================================ */
+        .progress-bar { height: 3px; background: var(--border-light); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-light));
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 2px;
+        }
+        
+        /* ============================================================
+           CONTROLS
+           ============================================================ */
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px 0; }
+        .control-group { display: flex; flex-direction: column; gap: 3px; }
+        
+        .control-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        
+        .select-input { width: 100%; }
+        
+        /* ============================================================
+           API CONFIG
+           ============================================================ */
+        .api-config { margin-top: 4px; }
+        
+        .api-config summary {
+            padding: 6px 0;
+            cursor: pointer;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .api-config-content { display: flex; flex-direction: column; gap: 8px; padding-bottom: 6px; }
+        
+        .api-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.78rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            letter-spacing: 0.5px;
+        }
+        
+        .api-input:focus { outline: none; border-color: var(--accent); }
+        
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .toggle-label input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 40px; height: 22px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 11px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s ease;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 0;
+        }
+        
+        .toggle-label input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 16px; height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .toggle-label input[type="checkbox"]:checked { background: #9b59b6; border-color: #9b59b6; }
+        .toggle-label input[type="checkbox"]:checked::before { transform: translateX(18px); }
+        .toggle-label input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
+        
+        /* ============================================================
+           INFO BAR
+           ============================================================ */
+        .info-bar { text-align: center; font-size: 0.68rem; color: var(--text-muted); padding: 4px 0; letter-spacing: 0.3px; }
+        
+        /* ============================================================
+           TOOLBAR BOTTOM
+           ============================================================ */
+        .toolbar-bottom {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 7px;
+            padding: 10px 0;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg);
+        }
+        
+        .btn-main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 6px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.68rem;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            min-height: 52px;
+            color: white;
+            letter-spacing: 0.3px;
+        }
+        
+        .btn-main:active { transform: scale(0.94); }
+        .btn-main .main-icon { width: 24px; height: 24px; flex-shrink: 0; }
+        .btn-main .main-icon svg { width: 100%; height: 100%; }
+        
+        .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); }
+        .btn-secondary { background: var(--bg-surface); border: 1px solid var(--border-light); }
+        .btn-accent { background: linear-gradient(135deg, #6c3483, #5b2c6f); border: 1px solid rgba(155, 89, 182, 0.3); }
+        
+        .btn-recording { animation: recordingPulse 1.5s infinite; background: var(--danger) !important; }
+        
+        @keyframes recordingPulse {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5); }
+            70% { box-shadow: 0 0 0 12px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+        
+        /* ============================================================
+           TOAST
+           ============================================================ */
+        .custom-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 10001;
+            font-size: 13px;
+            text-align: center;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            max-width: 90vw;
+            white-space: pre-line;
+            cursor: pointer;
+            font-family: inherit;
+            animation: toastUp 0.3s ease;
+            background: var(--toast-bg);
+            color: white;
+        }
+        
+        @keyframes toastUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        
+        @supports (padding: env(safe-area-inset-bottom)) {
+            .toolbar-bottom { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+            .app-header { padding-top: calc(12px + env(safe-area-inset-top)); }
+        }
+        
+        @media (max-width: 380px) {
+            .controls { grid-template-columns: 1fr 1fr; }
+            .toolbar-top { gap: 4px; }
+            .btn-tool { padding: 6px 8px; font-size: 0.7rem; gap: 4px; }
+        }
+        
+        @media (min-width: 500px) {
+            #app { padding: 0 20px; }
+            .btn-main { font-size: 0.75rem; }
+            .btn-main .main-icon { width: 28px; height: 28px; }
+            .text-area { min-height: 280px; font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner">
+            <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="22" cy="22" r="20" stroke="rgba(155, 89, 182, 0.2)" stroke-width="3" fill="none"/>
+                <path d="M22 2a20 20 0 0115.56 8.5" stroke="#9b59b6" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+        </div>
+    </div>
+    
+    <div id="app">
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="header-logo"><img src="icons/icon128.png" alt="Logo" width="36" height="36"></div>
+                <h1 class="app-title">QuickText<span class="accent"> Pro</span></h1>
+            </div>
+            <button id="installBtn" class="install-btn" style="display: none;">
+                <span class="install-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3v12M7 11l5 5 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </span> Installer
+            </button>
+        </header>
+        
+        <div id="modeIndicator" class="mode-indicator">Prêt</div>
+        
+        <div class="toolbar-top">
+            <button id="copyBtn" class="btn-tool"><span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="4" width="12" height="16" rx="2" stroke="#b07cc6" stroke-width="1.8" fill="none"/><path d="M5 8h-1a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-1" stroke="#b07cc6" stroke-width="1.8" fill="none"/></svg></span> Copier</button>
+            <button id="clearBtn" class="btn-tool btn-tool-danger"><span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16" stroke="#f08080" stroke-width="1.8" stroke-linecap="round"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" stroke="#f08080" stroke-width="1.8" fill="none"/><path d="M10 10v7M14 10v7" stroke="#f08080" stroke-width="1.8" stroke-linecap="round"/><path d="M5 6l1 14a1 1 0 001 1h10a1 1 0 001-1l1-14" stroke="#f08080" stroke-width="1.8" fill="none"/></svg></span> Effacer</button>
+            <button id="exportBtn" class="btn-tool"><span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v12" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round"/><path d="M7 8l5-5 5 5" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round"/></svg></span> Export</button>
+            <button id="importPdfBtn" class="btn-tool"><span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" stroke="#b07cc6" stroke-width="1.8" fill="none"/><path d="M14 2v6h6" stroke="#b07cc6" stroke-width="1.8" fill="none"/><path d="M9 13h2v4H9zM13 13h2v4h-2z" stroke="#b07cc6" stroke-width="1.5" stroke-linecap="round"/></svg></span> PDF</button>
+            <input type="file" id="pdfFileInput" accept=".pdf" style="display: none;">
+        </div>
+        
+        <div class="text-area-container">
+            <textarea id="output" class="text-area" placeholder="Appuyez sur le micro pour dicter, ou collez votre texte ici..."></textarea>
+            <div id="progressBar" class="progress-bar" style="display: none;"><div id="progressFill" class="progress-fill"></div></div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group"><label for="langSelect" class="control-label">Langue</label><select id="langSelect" class="select-input"><option value="fr-FR">🇫🇷 Français</option><option value="en-US">🇺🇸 English</option><option value="es-ES">🇪🇸 Español</option><option value="de-DE">🇩🇪 Deutsch</option><option value="it-IT">🇮🇹 Italiano</option><option value="pt-PT">🇵🇹 Português</option><option value="ru-RU">🇷🇺 Русский</option><option value="ja-JP">🇯🇵 日本語</option><option value="zh-CN">🇨🇳 中文</option></select></div>
+            <div class="control-group"><label for="speedSelect" class="control-label">Vitesse</label><select id="speedSelect" class="select-input"><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="0.9">0.9x</option><option value="1.0" selected>1x</option><option value="1.1">1.1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2.0">2x</option></select></div>
+            <div class="control-group"><label for="actionSelect" class="control-label">Action IA</label><select id="actionSelect" class="select-input"><option value="formatting" selected>✨ Correction</option><option value="summarize">📝 Synthèse</option><option value="reading">📚 Étudier</option><option value="memory">🧠 Mémo</option></select></div>
+        </div>
+        
+        <div class="api-config">
+            <details>
+                <summary><span style="display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;"><circle cx="9" cy="9" r="6" stroke="#707080" stroke-width="1.8" fill="none"/><path d="M13.5 13.5L21 21" stroke="#707080" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="9" r="1.5" fill="#707080"/></svg> API OpenRouter</span></summary>
+                <div class="api-config-content">
+                    <input type="password" id="apiKeyInput" class="api-input" placeholder="Votre clé API..." autocomplete="off">
+                    <label class="toggle-label"><input type="checkbox" id="apiKeyToggle"><span>Verrouiller la clé</span></label>
+                </div>
+            </details>
+        </div>
+        
+        <div id="formatInfo" class="info-bar"></div>
+        
+        <div class="toolbar-bottom">
+            <button id="recordBtn" class="btn-main btn-primary"><span class="main-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="2" width="6" height="11" rx="3" stroke="white" stroke-width="1.8" fill="none"/><path d="M5 10a7 7 0 007 7 7 7 0 007-7" stroke="white" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="17" x2="12" y2="22" stroke="white" stroke-width="1.8" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg></span><span>Dicter</span></button>
+            <button id="translateBtn" class="btn-main btn-secondary"><span class="main-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#e0e0e0" stroke-width="1.8" fill="none"/><ellipse cx="12" cy="12" rx="4" ry="10" stroke="#e0e0e0" stroke-width="1.5" fill="none"/><line x1="2" y1="12" x2="22" y2="12" stroke="#e0e0e0" stroke-width="1.5"/><line x1="12" y1="2" x2="12" y2="22" stroke="#e0e0e0" stroke-width="1.5"/></svg></span><span>Traduire</span></button>
+            <button id="playBtn" class="btn-main btn-secondary"><span class="main-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="7,4 20,12 7,20" stroke="#e0e0e0" stroke-width="1.8" stroke-linejoin="round" fill="none"/></svg></span><span>Lire</span></button>
+            <button id="iaBtn" class="btn-main btn-accent"><span class="main-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="5" stroke="#b07cc6" stroke-width="1.8" fill="none"/><circle cx="9" cy="10" r="1.5" fill="#b07cc6"/><circle cx="15" cy="10" r="1.5" fill="#b07cc6"/><path d="M8 16c1.5 2 4.5 2 6 0" stroke="#b07cc6" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M6 2l1 2-1 2M18 2l-1 2 1 2M2 6l2 1-2 1M22 6l-2 1 2 1" stroke="#b07cc6" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/></svg></span><span>IA</span></button>
+        </div>
+    </div>
+    
+    <script src="js/storage.js"></script>
+    <script src="js/speech.js"></script>
+    <script src="js/translation.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/pdf-handler.js"></script>
+    <script src="js/pdf-export.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        if (!window.pdfjsLib) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            script.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; };
+            document.head.appendChild(script);
+        }
+    </script>
+</body>
+</html>
