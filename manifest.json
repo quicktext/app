@@ -57,28 +57,20 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "screenshots/screen1.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "label": "Interface principale"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Dicter",
       "short_name": "Dicter",
       "description": "Demarrer la dictee vocale",
-      "url": "/?action=dictate",
-      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+      "url": "./?action=dictate",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Traduire",
       "short_name": "Traduire",
       "description": "Traduire le texte",
-      "url": "/?action=translate",
-      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+      "url": "./?action=translate",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
