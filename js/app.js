@@ -947,7 +947,7 @@
     // PWA
     // ============================================================
     
-    function setupPWA() {
+   function setupPWA() {
         let deferredPrompt;
         
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -969,9 +969,14 @@
             });
         }
         
+        // Enregistrement du Service Worker avec détection du chemin
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('SW OK'))
+            // Détecter le bon chemin de base (racine ou sous-dossier)
+            const basePath = location.pathname.replace(/\/[^/]*$/, '');
+            const swPath = basePath ? basePath + '/sw.js' : './sw.js';
+            
+            navigator.serviceWorker.register(swPath)
+                .then(reg => console.log('SW OK:', reg.scope))
                 .catch(err => console.warn('SW err:', err));
         }
     }
