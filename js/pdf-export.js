@@ -1,5 +1,5 @@
 // QuickText Voice Pro - Module Export PDF
-// Version finale - Logo top, ligne collée, espace avant titre, texte fixe
+// Version finale - Police pages suivantes corrigée, logo 30mm, espace date réduit
 
 const PDFExportModule = {
     /**
@@ -28,9 +28,20 @@ const PDFExportModule = {
         const marginLeft = 20;
         const marginRight = 20;
         const marginBottom = 25;
+        const contentWidth = pageWidth - marginLeft - marginRight;
         
-        // Position de début du corps du texte (fixe pour ne pas bouger)
-        const TEXT_START_Y = 85;
+        // Tailles de police
+        const FONT_SIZES = {
+            title: 16,
+            subtitle: 12,
+            body: 10,
+            date: 8,
+            footer: 8,
+            metadata: 8
+        };
+        
+        // Pourcentage du corps du texte (position de départ sur la page)
+        const BODY_TEXT_START_PERCENT = 28;
         
         // Couleur du thème
         const hasThemeColor = opts.themeColor && opts.themeColor !== '' && opts.themeColor !== '#ffffff' && opts.themeColor !== '#fff';
@@ -46,8 +57,9 @@ const PDFExportModule = {
             accent: themeColorLight
         };
         
-        let yPos = 0; // sera défini par addHeaderAndTitle
+        let yPos = 0;
         let pageNumber = 1;
+        let isFirstPage = true;
         
         // Logo
         let logoImg = null;
@@ -60,14 +72,43 @@ const PDFExportModule = {
         }
         
         // ============================================================
+        // CALCUL DES POSITIONS DYNAMIQUES
+        // ============================================================
+        
+        function calculateBodyStartY() {
+            let baseY = (pageHeight * BODY_TEXT_START_PERCENT) / 100;
+            
+            if (logoLoaded && logoImg) {
+                baseY = Math.max(baseY, 77); // logo(30) + ligne + titre + date ≈ 77mm
+            } else {
+                baseY = Math.max(baseY, 40);
+            }
+            
+            if (!opts.showDate) {
+                baseY = Math.max(baseY * 0.9, (logoLoaded ? 60 : 30));
+            }
+            
+            if (!title || title.trim() === '') {
+                baseY = Math.max(baseY * 0.8, (logoLoaded ? 45 : 20));
+            }
+            
+            return baseY;
+        }
+        
+        // ============================================================
         // FONCTIONS
         // ============================================================
         
         function addPage() {
             doc.addPage();
             pageNumber++;
-            // Sur les nouvelles pages, on commence à la marge haute (20mm)
+            isFirstPage = false;
+            // Sur les nouvelles pages, commencer à la marge haute
             yPos = 20;
+            // IMPORTANT : réinitialiser la police à la taille du corps du texte
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(FONT_SIZES.body);
+            doc.setTextColor(...colors.text);
         }
         
         function checkPageSpace(neededSpace) {
@@ -85,7 +126,8 @@ const PDFExportModule = {
             const footerY = pageHeight - 12;
             
             if (opts.showPagination) {
-                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(FONT_SIZES.footer);
                 doc.setTextColor(...colors.secondary);
                 doc.setDrawColor(...colors.accent);
                 doc.setLineWidth(0.3);
@@ -94,17 +136,15 @@ const PDFExportModule = {
             }
             
             if (!hideBranding) {
-                doc.setFontSize(7);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(FONT_SIZES.footer);
                 doc.text('QuickText Voice Pro', marginLeft, footerY);
             }
         }
         
-        /**
-         * Dessine l'en-tête (logo + ligne) et retourne la position Y pour le titre.
-         */
         function addHeader() {
             if (logoLoaded && logoImg) {
-                const logoSize = 54;
+                const logoSize = 37; // Taille du logo en mm
                 let logoX;
                 
                 switch (opts.logoPosition || 'center') {
@@ -114,58 +154,54 @@ const PDFExportModule = {
                     default: logoX = (pageWidth - logoSize) / 2; break;
                 }
                 
-                // Logo collé tout en haut (y=0)
                 try {
                     doc.addImage(logoImg, 'PNG', logoX, 0, logoSize, logoSize);
                 } catch (e) {
                     console.warn('Logo non ajouté:', e);
                 }
                 
-                // Ligne juste sous le logo, sans espace
                 doc.setDrawColor(...colors.primary);
                 doc.setLineWidth(0.6);
                 doc.line(marginLeft, logoSize, pageWidth - marginRight, logoSize);
                 
-                // Position après l'en-tête = sous la ligne + espace avant titre
-                return logoSize + 10; // 10mm d'espace après la ligne avant le titre
+                return logoSize + (logoSize * 0.33);
             } else {
-                // Pas de logo : ligne en haut de la page (à 18mm) avec espace avant titre
-                const lineY = 18;
+                const lineY = 12;
                 doc.setDrawColor(...colors.primary);
-                doc.setLineWidth(0.6);
+                doc.setLineWidth(0.4);
                 doc.line(marginLeft, lineY, pageWidth - marginRight, lineY);
-                return lineY + 10;
+                return lineY + 8;
             }
         }
         
         function addTitle(text) {
             checkPageSpace(20);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(16);
+            doc.setFontSize(FONT_SIZES.title);
             doc.setTextColor(...colors.dark);
             doc.text(text, marginLeft, yPos);
-            yPos += 8;
+            yPos += 10;
         }
         
         function addSubtitle(text) {
             checkPageSpace(14);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
+            doc.setFontSize(FONT_SIZES.subtitle);
             doc.setTextColor(...colors.primary);
             doc.text(text, marginLeft, yPos);
-            yPos += 6;
+            yPos += 8;
         }
         
         function addParagraph(text) {
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
+            doc.setFontSize(FONT_SIZES.body);
             doc.setTextColor(...colors.text);
             
             const cleanText = text.trim();
             if (!cleanText) return;
             
-            const lines = doc.splitTextToSize(cleanText, pageWidth - marginLeft - marginRight);
-            const lineHeight = 5;
+            const lines = doc.splitTextToSize(cleanText, contentWidth);
+            const lineHeight = 5.5;
             
             checkPageSpace(lines.length * lineHeight + 3);
             
@@ -180,12 +216,12 @@ const PDFExportModule = {
         
         function addBulletPoint(text) {
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
+            doc.setFontSize(FONT_SIZES.body);
             doc.setTextColor(...colors.text);
             
             const bulletText = '•  ' + text.trim();
-            const lines = doc.splitTextToSize(bulletText, pageWidth - marginLeft - marginRight - 5);
-            const lineHeight = 5;
+            const lines = doc.splitTextToSize(bulletText, contentWidth - 5);
+            const lineHeight = 5.5;
             
             checkPageSpace(lines.length * lineHeight + 3);
             
@@ -220,27 +256,31 @@ const PDFExportModule = {
         // GÉNÉRATION
         // ============================================================
         
-        // En-tête (logo + ligne) -> yPos positionné pour le titre
+        isFirstPage = true;
+        
+        // En-tête (logo + ligne)
         yPos = addHeader();
         
         // Titre du document
-        const docTitle = title || 'Document QuickText';
-        addTitle(docTitle);
+        const docTitle = title || '';
+        if (docTitle.trim()) {
+            addTitle(docTitle);
+        }
         
-        // Date (si activée)
+        // Date (si activée) - espace après la date réduit de moitié
         if (opts.showDate) {
             doc.setFont('helvetica', 'italic');
-            doc.setFontSize(9);
+            doc.setFontSize(FONT_SIZES.date);
             doc.setTextColor(...colors.secondary);
             doc.text(formatDate(), marginLeft, yPos);
-            yPos += 8;
+            yPos += 3; // Réduit de 6 à 3 (moitié)
         }
         
-        // ---- Forcer le début du texte à TEXT_START_Y ----
-        if (yPos < TEXT_START_Y) {
-            yPos = TEXT_START_Y;
+        // Position de départ dynamique du corps du texte
+        const bodyStartY = calculateBodyStartY();
+        if (yPos < bodyStartY) {
+            yPos = bodyStartY;
         }
-        // ------------------------------------------------
         
         // Texte principal
         const paragraphs = text.split(/\n\n+/);
@@ -277,7 +317,7 @@ const PDFExportModule = {
             addDivider();
             yPos += 2;
             doc.setFont('helvetica', 'italic');
-            doc.setFontSize(8);
+            doc.setFontSize(FONT_SIZES.metadata);
             doc.setTextColor(...colors.secondary);
             doc.text('Document généré par QuickText Voice Pro — ' + formatDate(), pageWidth / 2, yPos, { align: 'center' });
         }

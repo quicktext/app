@@ -388,7 +388,7 @@
             }
             return;
         }
-        
+
         try {
             if (navigator.permissions && navigator.permissions.query) {
                 try {
@@ -397,30 +397,29 @@
                         showToast('Microphone bloqué. Activez-le dans les paramètres.');
                         return;
                     }
-                } catch (e) {}
+                } catch(e) {}
             }
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
             });
             stream.getTracks().forEach(t => t.stop());
-            
+
             state._lastInterimText = '';
-            
+
+            // ✅ SAUVEGARDE DU TEXTE EXISTANT avant la nouvelle dictée
+            const baseText = DOM.output ? DOM.output.value : state.fullTranscript;
+
             await SpeechModule.startRecognition(
                 state.currentLang,
-                (finalText, interimText) => {
-                    if (finalText && finalText.trim()) {
-                        state.fullTranscript += finalText;
-                        if (!state.fullTranscript.endsWith(' ')) state.fullTranscript += ' ';
-                    }
-                    
-                    let displayText = state.fullTranscript;
+                (fullText, interimText) => {
+                    // fullText = texte complet de la session actuelle
+                    state.fullTranscript = baseText + fullText;
+                    let displayText = baseText + fullText;
                     if (interimText && interimText.trim() && interimText !== state._lastInterimText) {
                         displayText += interimText;
                         state._lastInterimText = interimText;
                     }
-                    
                     if (DOM.output) {
                         DOM.output.value = displayText;
                         DOM.output.scrollTop = DOM.output.scrollHeight;
@@ -432,11 +431,11 @@
                     updateModeIndicator('Erreur');
                 }
             );
-            
+
             setRecordButtonRecording();
             updateModeIndicator('🔴 Enregistrement...');
-            
-        } catch (e) {
+
+        } catch(e) {
             showToast('Erreur: ' + (e.message || 'Microphone indisponible'));
             resetRecordButton();
         }
