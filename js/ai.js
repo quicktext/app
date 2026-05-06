@@ -1,5 +1,6 @@
 // QuickText Voice Pro - Module IA
 // Version corrigée - Cohérence textes longs, nettoyage astérisques, interruption
+// Optimisé - Gestion erreurs 429/402/502, modèles fiables, délais entre tentatives
 
 const AIModule = {
     apiKey: null,
@@ -10,13 +11,14 @@ const AIModule = {
     config: {
         apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
         modelsUrl: 'https://openrouter.ai/api/v1/models',
-        cacheDuration: 3600000,
+        cacheDuration: 3600000,     // 1 heure de cache
         maxChunkSize: 3000,
         maxTokens: 4096,
         temperature: 0.1,
-        maxRetries: 5,
+        maxRetries: 3,              // Réduit de 5 à 3
         timeout: 30000,
-        overlapSize: 200
+        overlapSize: 200,
+        delayBetweenRetries: 2000   // 2 secondes entre chaque tentative
     },
     
     // ============================================================
@@ -64,6 +66,8 @@ const AIModule = {
             if (!response.ok) throw new Error('HTTP ' + response.status);
             
             const data = await response.json();
+            
+            // Filtrer les modèles gratuits (prix = 0)
             const freeModels = (data.data || [])
                 .filter(m => {
                     const p = parseFloat((m.pricing && m.pricing.prompt) || '0');
@@ -72,22 +76,42 @@ const AIModule = {
                 })
                 .map(m => m.id);
             
-            if (freeModels.length > 0) {
-                this.modelsCache = freeModels;
+            // Ne garder que les modèles gratuits fiables
+            const trulyFree = freeModels.filter(id => 
+                id.startsWith('deepseek/') || 
+                id.startsWith('google/gemini-2.0-flash') ||
+                id.startsWith('google/gemini-2.0-pro-exp') ||
+                id.startsWith('google/gemma-2-9b') ||
+                id === 'google/gemma-2-27b-it:free' ||
+                id === 'google/gemini-exp-1206:free' ||
+                id === 'google/gemini-2.0-flash-thinking-exp:free'
+            );
+            
+            if (trulyFree.length > 0) {
+                this.modelsCache = trulyFree;
                 this.lastFetch = now;
-                console.log('IA: ' + freeModels.length + ' modèles gratuits trouvés');
-                return this.prioritizeModels(freeModels);
+                console.log('IA: ' + trulyFree.length + ' modèles gratuits fiables trouvés');
+                return this.prioritizeModels(trulyFree);
             }
+            
+            // Si aucun modèle fiable trouvé, utiliser les modèles de secours
+            console.warn('IA: Aucun modèle fiable trouvé, utilisation des modèles de secours');
+            
         } catch (e) {
             console.warn('IA: Erreur fetch modèles:', e.message);
         }
         
-        return [
+        // Liste de secours : modèles gratuits testés et fiables
+        const fallbackModels = [
             'deepseek/deepseek-chat:free',
             'deepseek/deepseek-r1:free',
             'google/gemini-2.0-flash-001:free',
             'google/gemma-2-9b-it:free'
         ];
+        
+        this.modelsCache = fallbackModels;
+        this.lastFetch = now;
+        return this.prioritizeModels(fallbackModels);
     },
     
     prioritizeModels(models) {
@@ -498,7 +522,7 @@ Texte a memoriser :`
     },
     
     // ============================================================
-    // APPEL AU MODÈLE
+    // APPEL AU MODÈLE (optimisé avec gestion des erreurs)
     // ============================================================
     
     async callModel(models, fullPrompt, signal, onProgress) {
@@ -527,17 +551,6 @@ Texte a memoriser :`
                     timeoutController.abort();
                 }, this.config.timeout);
                 
-                // Combiner le signal utilisateur avec le timeout
-                let combinedSignal = timeoutController.signal;
-                
-                if (signal) {
-                    // Écouter les deux signaux
-                    const onAbort = () => {
-                        timeoutController.abort();
-                    };
-                    signal.addEventListener('abort', onAbort, { once: true });
-                }
-                
                 const response = await fetch(this.config.apiUrl, {
                     method: 'POST',
                     headers: {
@@ -556,18 +569,62 @@ Texte a memoriser :`
                 
                 clearTimeout(timeoutId);
                 
-                // Nettoyer l'écouteur d'interruption
-                if (signal) {
-                    signal.removeEventListener('abort', () => {});
+                // === GESTION DES ERREURS HTTP ===
+                
+                // 429 - Too Many Requests (limite de taux atteinte)
+                if (response.status === 429) {
+                    console.warn('IA: Limite de requêtes atteinte (429), pause de 5 secondes...');
+                    lastError = new Error('Trop de requêtes. Veuillez patienter quelques secondes.');
+                    
+                    // Attendre 5 secondes avant de continuer
+                    await new Promise(r => {
+                        const timer = setTimeout(r, 5000);
+                        if (signal) signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+                    });
+                    
+                    // Réessayer avec le même modèle après la pause
+                    if (i < maxModels - 1) {
+                        console.log('IA: Nouvelle tentative après pause...');
+                        continue;
+                    }
                 }
                 
+                // 402 - Payment Required (modèle payant)
+                if (response.status === 402) {
+                    console.warn('IA: Modèle payant détecté (402), passage au suivant');
+                    lastError = new Error('Ce modèle nécessite des crédits');
+                    continue;
+                }
+                
+                // 502 - Bad Gateway (erreur serveur temporaire)
+                if (response.status === 502) {
+                    console.warn('IA: Erreur serveur (502), pause de 3 secondes...');
+                    lastError = new Error('Erreur serveur temporaire');
+                    
+                    await new Promise(r => {
+                        const timer = setTimeout(r, 3000);
+                        if (signal) signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+                    });
+                    continue;
+                }
+                
+                // Autres erreurs HTTP
                 if (!response.ok) {
                     const errorText = await response.text();
                     lastError = new Error('HTTP ' + response.status + ': ' + errorText.substring(0, 100));
                     console.warn('IA: ' + shortName + ' erreur HTTP:', lastError.message);
+                    
+                    // Pause avant le modèle suivant
+                    if (i < maxModels - 1) {
+                        await new Promise(r => {
+                            const timer = setTimeout(r, this.config.delayBetweenRetries);
+                            if (signal) signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+                        });
+                    }
                     continue;
                 }
                 
+                // Succès - Traiter la réponse
                 const data = await response.json();
                 
                 if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
@@ -590,6 +647,7 @@ Texte a memoriser :`
             } catch (e) {
                 clearTimeout(timeoutId);
                 
+                // Erreur d'interruption volontaire
                 if (e.name === 'AbortError') {
                     throw e;
                 }
@@ -597,14 +655,23 @@ Texte a memoriser :`
                 console.warn('IA: ' + shortName + ' echoue:', e.message);
                 lastError = e;
                 
+                // Erreur réseau - arrêter complètement
                 if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
                     throw new Error('Pas d\'acces internet. Verifiez votre connexion.');
                 }
                 
+                // Pause avant de passer au modèle suivant
+                if (i < maxModels - 1) {
+                    await new Promise(r => {
+                        const timer = setTimeout(r, this.config.delayBetweenRetries);
+                        if (signal) signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+                    });
+                }
                 continue;
             }
         }
         
-        throw lastError || new Error('Tous les modeles ont echoue. Verifiez votre cle API.');
+        // Tous les modèles ont échoué
+        throw lastError || new Error('Tous les modeles ont echoue. Verifiez votre cle API ou patientez quelques minutes.');
     }
 };
