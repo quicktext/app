@@ -23,13 +23,22 @@
         setupPWA();
         loadVoices();
         
+        // Initialiser le module de crédits
+        await CreditModule.init();
+
+        // Initialiser le module de crédits
+        if (typeof CreditModule !== 'undefined') {
+            await CreditModule.init();
+            updateCreditsDisplay();
+        }
+
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) loadingScreen.classList.add('hidden');
         
         const app = document.getElementById('app');
         if (app) app.style.display = 'flex';
         
-        console.log('✅ QuickText Voice Pro - Prêt');
+        console.log('QuickText Voice Pro - Prêt');
     }
     
     function cacheDOM() {
@@ -39,12 +48,142 @@
             'langSelect', 'speedSelect', 'actionSelect',
             'apiKeyInput', 'apiKeyToggle',
             'modeIndicator', 'progressBar', 'progressFill',
-            'formatInfo', 'installBtn'
+            'formatInfo', 'installBtn',
+            'creditsBadge', 'creditsCount', 'rechargeBtn' 
         ];
         
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
     }
-    
+
+        /**
+     * Met à jour l'affichage des crédits
+     */
+    function updateCreditsDisplay() {
+        if (!DOM.creditsCount || typeof CreditModule === 'undefined') return;
+        
+        const credits = CreditModule.currentCredits;
+        DOM.creditsCount.textContent = credits;
+        
+        if (credits <= 5) {
+            DOM.creditsBadge?.classList.add('low');
+        } else {
+            DOM.creditsBadge?.classList.remove('low');
+        }
+        
+        // Clic sur le badge → résumé
+        if (DOM.creditsBadge) {
+            DOM.creditsBadge.onclick = () => {
+                showToast(
+                    credits + ' crédits disponibles\n\n' +
+                    'Services :\n' +
+                    '• Dictée : 1 crédit/min\n' +
+                    '• Traduction : 3 crédits/1000 car.\n' +
+                    '• IA : 5 crédits/requête\n' +
+                    '• PDF : 2 crédits/export\n' +
+                    '• Lecture : 1 crédit/1000 car.',
+                    'info',
+                    5000
+                );
+            };
+        }
+
+    }
+
+    function showRechargePopup() {
+        if (document.querySelector('.popup-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'popup-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+
+        // Cloner la section recharge et la rendre visible
+        const rechargeSection = document.getElementById('rechargeSection').cloneNode(true);
+        rechargeSection.style.display = 'block';
+
+        // Mettre à jour l'affichage des crédits
+        const creditDisplay = rechargeSection.querySelector('#creditDisplay');
+        if (creditDisplay) {
+            creditDisplay.textContent = CreditModule.currentCredits;
+        }
+
+        // Insérer dans un dialogue
+        const dialog = document.createElement('div');
+        dialog.className = 'popup-dialog';
+        dialog.appendChild(rechargeSection);
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        // --- Gestion des événements ---
+        function close() {
+            if (overlay.parentNode) overlay.remove();
+        }
+
+        overlay.querySelector('#closeRechargePopup')?.addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+        // Bouton Recharger
+        overlay.querySelector('#confirmRecharge')?.addEventListener('click', async () => {
+            const phoneInput = overlay.querySelector('#phoneNumber');
+            const amountInput = overlay.querySelector('#amountInput');
+            const phone = phoneInput?.value.trim();
+            const amountStr = amountInput?.value.trim();
+
+            if (!/^[67]\d{8}$/.test(phone)) {
+                showToast('Numéro invalide. Exemple : 69xxxxxxx (9 chiffres)');
+                phoneInput?.focus();
+                return;
+            }
+
+            const amount = parseInt(amountStr, 10);
+            if (isNaN(amount) || amount < 1 || amount > 1000000) {
+                showToast('Montant invalide (1 à 1 000 000 XAF)');
+                amountInput?.focus();
+                return;
+            }
+
+            // Désactiver le bouton pour éviter double clic
+            const confirmBtn = overlay.querySelector('#confirmRecharge');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Patientez...';
+
+            try {
+                const response = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/handle-recharge',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey
+                        },
+                        body: JSON.stringify({
+                            user_id: CreditModule.userID,
+                            phone: phone,
+                            amount: amount
+                        })
+                    }
+                );
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(`Recharge réussie ! ${result.credits_added} crédits ajoutés.`);
+                    await CreditModule.syncCredits();
+                    updateCreditsDisplay();
+                    close(); // fermer le pop-up
+                } else {
+                    showToast(result.message || result.error || 'Échec de la recharge.');
+                }
+            } catch (e) {
+                showToast('Erreur réseau lors de la recharge.');
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Recharger';
+            }
+        });
+    }
+
     function loadPreferences() {
         state.currentLang = window.storage.get('selectedLang', 'fr-FR');
         state.speechRate = window.storage.get('speechRate', '1.0');
@@ -72,9 +211,30 @@
     function setupEvents() {
         if (DOM.recordBtn) DOM.recordBtn.addEventListener('click', toggleRecording);
         if (DOM.translateBtn) DOM.translateBtn.addEventListener('click', handleTranslation);
+        if (DOM.rechargeBtn) {
+            DOM.rechargeBtn.addEventListener('click', showRechargePopup);
+        }
         if (DOM.playBtn) {
-            DOM.playBtn.addEventListener('click', toggleSpeech);
-            DOM.playBtn.addEventListener('dblclick', stopSpeech);
+            let clickTimer = null;
+            DOM.playBtn.addEventListener('click', (e) => {
+                // Empêche le simple clic d’interférer avec le double‑clic
+                if (clickTimer) {
+                    clearTimeout(clickTimer);
+                    clickTimer = null;
+                    return;                       // laisse le dblclick agir seul
+                }
+                clickTimer = setTimeout(() => {
+                    clickTimer = null;
+                    toggleSpeech();               // simple clic = lecture / pause / reprise
+                }, 250);
+            });
+            DOM.playBtn.addEventListener('dblclick', (e) => {
+                if (clickTimer) {
+                    clearTimeout(clickTimer);
+                    clickTimer = null;
+                }
+                stopSpeech();                     // double‑clic = arrêt total
+            });
         }
         if (DOM.iaBtn) {
             DOM.iaBtn.addEventListener('click', handleIA);
@@ -386,6 +546,19 @@
                 state.fullTranscript = DOM.output.value;
                 window.storage.setSession('currentText', DOM.output.value);
             }
+
+            // Déduire les crédits et rafraîchir
+            try {
+                await CreditModule.useCredits('dictation');
+                updateCreditsDisplay();
+            } catch(e) { /* silencieux */ }
+
+            return;
+        }
+            try {
+            await CreditModule.canUseService('dictation');
+        } catch (e) {
+            showToast(e.message);
             return;
         }
 
@@ -407,7 +580,7 @@
 
             state._lastInterimText = '';
 
-            // ✅ SAUVEGARDE DU TEXTE EXISTANT avant la nouvelle dictée
+            // SAUVEGARDE DU TEXTE EXISTANT avant la nouvelle dictée
             const baseText = DOM.output ? DOM.output.value : state.fullTranscript;
 
             await SpeechModule.startRecognition(
@@ -470,21 +643,32 @@
         if (!text || !text.trim()) { showToast('Aucun texte à traduire'); return; }
         
         if (DOM.translateBtn) DOM.translateBtn.disabled = true;
-        updateModeIndicator('🌐 Traduction...');
+        updateModeIndicator('Traduction...');
         
+        try {
+            await CreditModule.canUseService('translation');
+        } catch (e) {
+            showToast(e.message);
+            return;
+        }
+
         try {
             const translated = await TranslationModule.translate(text, state.currentLang);
             state.translatedText = translated;
             if (DOM.output) DOM.output.value = translated;
             state.fullTranscript = translated;
-            updateModeIndicator('✅ Traduit');
+            updateModeIndicator('Traduit');
             showToast('Traduction terminée');
         } catch (e) {
             showToast('Erreur: ' + e.message);
-            updateModeIndicator('❌ Erreur');
+            updateModeIndicator('Erreur');
         } finally {
             if (DOM.translateBtn) DOM.translateBtn.disabled = false;
         }
+
+        await CreditModule.useCredits('translation');
+        updateCreditsDisplay();
+
     }
     
     // ============================================================
@@ -509,7 +693,13 @@
         SpeechModule.onPause = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Reprendre'; };
         SpeechModule.onResume = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Pause'; };
         SpeechModule.onStop = resetPlayButton;
-        SpeechModule.onFinish = resetPlayButton;
+        SpeechModule.onFinish = () => {
+            resetPlayButton();
+            // Déduire crédits
+            CreditModule.useCredits('speech_reading')
+                .then(() => updateCreditsDisplay())
+                .catch(() => {});
+        };
         
         SpeechModule.speak(text, state.currentLang, parseFloat(state.speechRate));
     }
@@ -542,6 +732,13 @@
     
     async function handleIA() {
         if (state.isProcessingIA) return;
+
+        try {
+            await CreditModule.canUseService('ia_processing');
+        } catch (e) {
+            showToast(e.message);
+            return;
+        }
         
         const text = DOM.output ? DOM.output.value : '';
         if (!text || !text.trim()) { showToast('Aucun texte à traiter'); return; }
@@ -591,6 +788,10 @@
             }
             setTimeout(() => { if (DOM.progressBar && !state.isProcessingIA) DOM.progressBar.style.display = 'none'; }, 2000);
         }
+
+        await CreditModule.useCredits('ia_processing');
+        updateCreditsDisplay(); // ← Mettre à jour l'affichage
+
     }
     
     // ============================================================
@@ -612,7 +813,7 @@
     // EXPORT PDF + TXT (avec titre personnalisable)
     // ============================================================
 
-    function handleExport() {
+   async function handleExport() {
         const text = DOM.output ? DOM.output.value : '';
         if (!text || !text.trim()) { showToast('Aucun texte à exporter'); return; }
         
@@ -637,6 +838,9 @@
             
             showExportPDFPopup(text, pdfIconSVG, defaultTitle);
         }, 500);
+
+        await CreditModule.useCredits('pdf_export');
+        updateCreditsDisplay(); 
     }
 
     function showExportPDFPopup(text, iconSVG, defaultTitle) {
