@@ -175,8 +175,8 @@
                 } else {
                     // Afficher le vrai message d’erreur
                     const errorMsg = result.message || result.error || JSON.stringify(result);
-                    showToast('❌ ' + errorMsg);
-                    console.log('Réponse MeSomb complète :', result);
+                    showToast(errorMsg);
+                    console.log('Réponse MeSomb complète :', JSON.stringify(result, null, 2));
                 }
             } catch (e) {
                 showToast('Erreur réseau lors de la recharge.');
