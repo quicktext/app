@@ -130,6 +130,7 @@
             const phone = phoneInput?.value.trim();
             const amountStr = amountInput?.value.trim();
 
+            // Validation téléphone
             const phoneRegex = /^[67]\d{8}$/;
             if (!phoneRegex.test(phone)) {
                 showToast('Numéro invalide. Exemple : 696271312 (9 chiffres, commence par 6 ou 7).');
@@ -137,6 +138,7 @@
                 return;
             }
 
+            // Validation montant
             const amount = parseInt(amountStr, 10);
             if (isNaN(amount) || amount < 1 || amount > 1000000) {
                 showToast('Montant invalide (1 à 1 000 000 XAF).');
@@ -144,94 +146,49 @@
                 return;
             }
 
+            // Désactiver le bouton pour éviter double clic
             const confirmBtn = overlay.querySelector('#confirmRecharge');
             confirmBtn.disabled = true;
             confirmBtn.textContent = '⏳ Patientez...';
 
             try {
-                // Appel à VOTRE proxy (clés côté serveur)
-                const response = await fetch('https://mesomb-proxy.onrender.com/api/recharge', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ phone, amount })
-                });
-
-                const result = await response.json();
-                console.log('Réponse :', result);
-
-                if (result.success) {
-                    const creditsToAdd = Math.floor(amount / 10);
-                    
-                    await CreditModule.syncCredits();
-                    const newCredits = CreditModule.currentCredits + creditsToAdd;
-                    
-                    const supabaseUrl = 'https://zhvdyjpevrqteirqeztb.supabase.co';
-                    const supabaseKey = CreditModule.config.anonKey;
-                    
-                    // Récupérer ID interne
-                    const userFilter = 'user_id=eq.' + encodeURIComponent(CreditModule.userID);
-                    const userResponse = await fetch(
-                        `${supabaseUrl}/rest/v1/users?select=id&${userFilter}`,
-                        {
-                            headers: {
-                                'apikey': supabaseKey,
-                                'Authorization': 'Bearer ' + supabaseKey
-                            }
-                        }
-                    );
-                    
-                    const users = await userResponse.json();
-                    if (!users || users.length === 0) {
-                        showToast('⚠️ Paiement OK mais utilisateur introuvable.');
-                        confirmBtn.disabled = false;
-                        confirmBtn.textContent = 'Recharger';
-                        return;
-                    }
-                    
-                    const internalId = users[0].id;
-                    
-                    await fetch(`${supabaseUrl}/rest/v1/users?id=eq.${internalId}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'apikey': supabaseKey,
-                            'Authorization': 'Bearer ' + supabaseKey,
-                            'Content-Type': 'application/json',
-                            'Prefer': 'return=minimal'
-                        },
-                        body: JSON.stringify({
-                            credits: newCredits,
-                            last_used: new Date().toISOString()
-                        })
-                    });
-                    
-                    await fetch(`${supabaseUrl}/rest/v1/transactions`, {
+                // Appel à l'Edge Function Supabase (clés MeSomb côté serveur, jamais exposées)
+                const response = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/handle-recharge',
+                    {
                         method: 'POST',
                         headers: {
-                            'apikey': supabaseKey,
-                            'Authorization': 'Bearer ' + supabaseKey,
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey,
                         },
                         body: JSON.stringify({
-                            user_id: CreditModule.userID,
-                            type: 'credit',
-                            amount: creditsToAdd,
-                            service: 'recharge_mesomb',
-                            details: `Paiement ${amount} XAF via ${phone}`
-                        })
-                    });
+                            phone: phone,
+                            amount: amount,
+                            user_id: CreditModule.userID
+                        }),
+                    }
+                );
+
+                const result = await response.json();
+                console.log('Réponse recharge :', JSON.stringify(result, null, 2));
+
+                if (result.success) {
+                    // Recharge réussie : crédits déjà ajoutés par l'Edge Function
+                    showToast(`✅ Recharge réussie ! ${result.credits_added} crédits ajoutés.`);
                     
+                    // Synchroniser les crédits avec Supabase
                     await CreditModule.syncCredits();
                     updateCreditsDisplay();
-                    showToast(`Recharge réussie ! ${creditsToAdd} crédits ajoutés.`);
                     close();
                 } else {
-                    showToast((result.detail || result.message || 'Échec de la transaction'));
+                    // Afficher l'erreur renvoyée par l'Edge Function
+                    const errorMsg = result.message || 'Échec de la transaction';
+                    showToast('❌ ' + errorMsg);
                 }
             } catch (e) {
-                console.error('Erreur :', e);
-                showToast('Erreur réseau. Vérifiez votre connexion.');
+                console.error('Erreur recharge :', e);
+                showToast('Erreur réseau lors de la recharge. Vérifiez votre connexion.');
             } finally {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = 'Recharger';
