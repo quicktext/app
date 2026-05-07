@@ -130,7 +130,6 @@
             const phone = phoneInput?.value.trim();
             const amountStr = amountInput?.value.trim();
 
-            // Validation téléphone
             const phoneRegex = /^[67]\d{8}$/;
             if (!phoneRegex.test(phone)) {
                 showToast('Numéro invalide. Exemple : 696271312 (9 chiffres, commence par 6 ou 7).');
@@ -138,7 +137,6 @@
                 return;
             }
 
-            // Validation montant
             const amount = parseInt(amountStr, 10);
             if (isNaN(amount) || amount < 1 || amount > 1000000) {
                 showToast('Montant invalide (1 à 1 000 000 XAF).');
@@ -146,78 +144,47 @@
                 return;
             }
 
-            // Désactiver le bouton pour éviter double clic
             const confirmBtn = overlay.querySelector('#confirmRecharge');
             confirmBtn.disabled = true;
             confirmBtn.textContent = '⏳ Patientez...';
 
             try {
-                // Clés MeSomb
-                const appKey = 'e18d9eeaca13e7a980f4cf788de3d340d611ea3e';
-                const accessKey = '78c7de30-1966-4251-826c-1294d476de47';
-                const secretKey = '4c255aea-0b18-4c3b-846d-4656147c90d8';
-                
-                const service = phone.startsWith('6') ? 'MTN' : 'ORANGE';
-                
-                const payload = {
-                    payer: phone,
-                    amount: Number(amount),
-                    service: service,
-                    country: 'CM',
-                    currency: 'XAF',
-                    nonce: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
-                };
-
-                // Appel direct à MeSomb via proxy CORS
-                const response = await fetch(
-                    'https://corsproxy.io/?' + encodeURIComponent('https://mesomb.hachther.com/api/v1.0/payment/collect/'),
-                    {
-                        method: 'POST',
-                        headers: {
-                            'X-MeSomb-Application': appKey,
-                            'X-MeSomb-AccessKey': accessKey,
-                            'X-MeSomb-SecretKey': secretKey,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(payload),
-                    }
-                );
+                // Appel à VOTRE proxy (clés côté serveur)
+                const response = await fetch('https://mesomb-proxy.onrender.com/api/recharge', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phone, amount })
+                });
 
                 const result = await response.json();
-                console.log('Réponse MeSomb :', JSON.stringify(result, null, 2));
+                console.log('Réponse :', result);
 
                 if (result.success) {
-                    // Calculer les crédits à ajouter (1 crédit = 10 XAF)
                     const creditsToAdd = Math.floor(amount / 10);
                     
-                    // Récupérer les crédits actuels depuis Supabase
                     await CreditModule.syncCredits();
-                    const currentCredits = CreditModule.currentCredits;
-                    const newCredits = currentCredits + creditsToAdd;
+                    const newCredits = CreditModule.currentCredits + creditsToAdd;
                     
-                    // Mettre à jour dans Supabase
                     const supabaseUrl = 'https://zhvdyjpevrqteirqeztb.supabase.co';
                     const supabaseKey = CreditModule.config.anonKey;
                     
-                    // Récupérer l'ID interne de l'utilisateur
+                    // Récupérer ID interne
                     const userFilter = 'user_id=eq.' + encodeURIComponent(CreditModule.userID);
                     const userResponse = await fetch(
                         `${supabaseUrl}/rest/v1/users?select=id&${userFilter}`,
                         {
                             headers: {
                                 'apikey': supabaseKey,
-                                'Authorization': 'Bearer ' + supabaseKey,
-                            },
+                                'Authorization': 'Bearer ' + supabaseKey
+                            }
                         }
                     );
                     
-                    if (!userResponse.ok) {
-                        throw new Error('Utilisateur introuvable');
-                    }
-                    
                     const users = await userResponse.json();
                     if (!users || users.length === 0) {
-                        showToast('⚠️ Paiement OK mais utilisateur introuvable. Contactez le support.');
+                        showToast('⚠️ Paiement OK mais utilisateur introuvable.');
                         confirmBtn.disabled = false;
                         confirmBtn.textContent = 'Recharger';
                         return;
@@ -225,60 +192,46 @@
                     
                     const internalId = users[0].id;
                     
-                    // Mettre à jour les crédits
-                    const updateResponse = await fetch(
-                        `${supabaseUrl}/rest/v1/users?id=eq.${internalId}`,
-                        {
-                            method: 'PATCH',
-                            headers: {
-                                'apikey': supabaseKey,
-                                'Authorization': 'Bearer ' + supabaseKey,
-                                'Content-Type': 'application/json',
-                                'Prefer': 'return=minimal',
-                            },
-                            body: JSON.stringify({
-                                credits: newCredits,
-                                last_used: new Date().toISOString(),
-                            }),
-                        }
-                    );
+                    await fetch(`${supabaseUrl}/rest/v1/users?id=eq.${internalId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': 'Bearer ' + supabaseKey,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=minimal'
+                        },
+                        body: JSON.stringify({
+                            credits: newCredits,
+                            last_used: new Date().toISOString()
+                        })
+                    });
                     
-                    if (updateResponse.ok) {
-                        // Enregistrer la transaction
-                        await fetch(`${supabaseUrl}/rest/v1/transactions`, {
-                            method: 'POST',
-                            headers: {
-                                'apikey': supabaseKey,
-                                'Authorization': 'Bearer ' + supabaseKey,
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                user_id: CreditModule.userID,
-                                type: 'credit',
-                                amount: creditsToAdd,
-                                service: 'recharge_mesomb',
-                                details: `Paiement ${amount} XAF via ${service} (${phone})`,
-                            }),
-                        });
-                        
-                        // Synchroniser et mettre à jour l'affichage
-                        await CreditModule.syncCredits();
-                        updateCreditsDisplay();
-                        showToast(`✅ Recharge réussie ! ${creditsToAdd} crédits ajoutés.`);
-                        close();
-                    } else {
-                        const errorText = await updateResponse.text();
-                        console.error('Erreur mise à jour crédits :', errorText);
-                        showToast('⚠️ Paiement OK mais échec mise à jour crédits. Contactez le support.');
-                    }
+                    await fetch(`${supabaseUrl}/rest/v1/transactions`, {
+                        method: 'POST',
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': 'Bearer ' + supabaseKey,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            user_id: CreditModule.userID,
+                            type: 'credit',
+                            amount: creditsToAdd,
+                            service: 'recharge_mesomb',
+                            details: `Paiement ${amount} XAF via ${phone}`
+                        })
+                    });
+                    
+                    await CreditModule.syncCredits();
+                    updateCreditsDisplay();
+                    showToast(`Recharge réussie ! ${creditsToAdd} crédits ajoutés.`);
+                    close();
                 } else {
-                    // Afficher le message d'erreur de MeSomb
-                    const errorMsg = result.detail || result.message || 'Échec de la transaction';
-                    showToast('❌ ' + errorMsg);
+                    showToast((result.detail || result.message || 'Échec de la transaction'));
                 }
             } catch (e) {
-                console.error('Erreur recharge :', e);
-                showToast('Erreur réseau lors de la recharge. Vérifiez votre connexion.');
+                console.error('Erreur :', e);
+                showToast('Erreur réseau. Vérifiez votre connexion.');
             } finally {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = 'Recharger';
