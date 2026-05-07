@@ -171,9 +171,12 @@
                     showToast(`Recharge réussie ! ${result.credits_added} crédits ajoutés.`);
                     await CreditModule.syncCredits();
                     updateCreditsDisplay();
-                    close(); // fermer le pop-up
+                    close();
                 } else {
-                    showToast(result.message || result.error || 'Échec de la recharge.');
+                    // Afficher le vrai message d’erreur
+                    const errorMsg = result.message || result.error || JSON.stringify(result);
+                    showToast('❌ ' + errorMsg);
+                    console.log('Réponse MeSomb complète :', result);
                 }
             } catch (e) {
                 showToast('Erreur réseau lors de la recharge.');
