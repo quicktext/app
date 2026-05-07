@@ -133,7 +133,7 @@
             // Validation téléphone
             const phoneRegex = /^[67]\d{8}$/;
             if (!phoneRegex.test(phone)) {
-                showToast('Numéro invalide. Exemple : 696271312 (9 chiffres, commence par 6 ou 7).');
+                showToast('📱 Numéro invalide. Exemple : 696271312 (9 chiffres, commence par 6 ou 7).');
                 phoneInput?.focus();
                 return;
             }
@@ -141,7 +141,7 @@
             // Validation montant
             const amount = parseInt(amountStr, 10);
             if (isNaN(amount) || amount < 1 || amount > 1000000) {
-                showToast('Montant invalide (1 à 1 000 000 XAF).');
+                showToast('💵 Montant invalide (1 à 1 000 000 XAF).');
                 amountInput?.focus();
                 return;
             }
@@ -151,45 +151,77 @@
             confirmBtn.disabled = true;
             confirmBtn.textContent = '⏳ Patientez...';
 
+            // Timeout de 45 secondes
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000);
+
             try {
-                // Appel à l'Edge Function Supabase (clés MeSomb côté serveur, jamais exposées)
+                const supabaseUrl = 'https://zhvdyjpevrqteirqeztb.supabase.co';
+                const anonKey = CreditModule.config.anonKey;
+
+                // Étape 1 : Appeler l'Edge Function Supabase pour le paiement MeSomb
                 const response = await fetch(
-                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/handle-recharge',
+                    `${supabaseUrl}/functions/v1/handle-recharge`,
                     {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
-                            'apikey': CreditModule.config.anonKey,
+                            'Authorization': 'Bearer ' + anonKey,
+                            'apikey': anonKey,
                         },
                         body: JSON.stringify({
                             phone: phone,
                             amount: amount,
-                            user_id: CreditModule.userID
+                            user_id: CreditModule.userID,
                         }),
+                        signal: controller.signal,
                     }
                 );
 
-                const result = await response.json();
+                clearTimeout(timeoutId);
+
+                // Lire la réponse
+                let result;
+                try {
+                    result = await response.json();
+                } catch (parseError) {
+                    const rawText = await response.text();
+                    console.error('Réponse non JSON :', rawText);
+                    throw new Error('Réponse invalide du serveur (HTTP ' + response.status + ')');
+                }
+
                 console.log('Réponse recharge :', JSON.stringify(result, null, 2));
 
+                // Traiter la réponse
                 if (result.success) {
-                    // Recharge réussie : crédits déjà ajoutés par l'Edge Function
-                    showToast(`✅ Recharge réussie ! ${result.credits_added} crédits ajoutés.`);
-                    
-                    // Synchroniser les crédits avec Supabase
+                    // Succès : crédits déjà ajoutés par l'Edge Function
                     await CreditModule.syncCredits();
                     updateCreditsDisplay();
+                    showToast('✅ Recharge réussie ! ' + result.credits_added + ' crédits ajoutés.');
                     close();
                 } else {
-                    // Afficher l'erreur renvoyée par l'Edge Function
-                    const errorMsg = result.message || 'Échec de la transaction';
+                    // Erreur renvoyée par l'Edge Function ou MeSomb
+                    const errorMsg = result.message || result.error || result.detail || 'Échec de la transaction';
                     showToast('❌ ' + errorMsg);
+                    console.warn('Échec recharge :', result);
                 }
+
             } catch (e) {
+                clearTimeout(timeoutId);
                 console.error('Erreur recharge :', e);
-                showToast('Erreur réseau lors de la recharge. Vérifiez votre connexion.');
+
+                // Messages d'erreur selon le type
+                if (e.name === 'AbortError') {
+                    showToast('⏰ Délai dépassé. Vérifiez votre connexion internet et réessayez.');
+                } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+                    showToast('📡 Pas de connexion internet. Vérifiez votre réseau.');
+                } else if (e.message.includes('HTTP')) {
+                    showToast('🔧 ' + e.message);
+                } else {
+                    showToast('⚠️ Erreur : ' + e.message);
+                }
             } finally {
+                // Réactiver le bouton dans tous les cas
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = 'Recharger';
             }
