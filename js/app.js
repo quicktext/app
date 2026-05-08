@@ -786,8 +786,13 @@
         }
         
         const text = DOM.output ? DOM.output.value : '';
-        if (!text || !text.trim()) { showToast('Aucun texte à traiter'); return; }
-        if (!AIModule.getApiKey()) { showToast('Configurez votre clé API OpenRouter'); return; }
+        if (!text || !text.trim()) { 
+            showToast('Aucun texte à traiter'); 
+            return; 
+        }
+        
+        // SUPPRIMÉ : la vérification de clé API utilisateur
+        // Si pas de clé, DeepSeek prendra le relais automatiquement
         
         state.isProcessingIA = true;
         
@@ -798,7 +803,7 @@
         
         if (DOM.progressBar) DOM.progressBar.style.display = 'block';
         if (DOM.progressFill) DOM.progressFill.style.width = '0%';
-        updateModeIndicator('🤖 IA en cours...');
+        updateModeIndicator('IA en cours...');
         
         try {
             const result = await AIModule.processText(
@@ -806,14 +811,14 @@
                 (current, total, label) => {
                     const percent = Math.round((current / total) * 100);
                     if (DOM.progressFill) DOM.progressFill.style.width = percent + '%';
-                    updateModeIndicator('🤖 ' + label);
+                    updateModeIndicator(label);
                 }
             );
             
             if (result && result.trim() && state.isProcessingIA) {
                 if (DOM.output) DOM.output.value = result;
                 state.fullTranscript = result;
-                updateModeIndicator('✅ Terminé');
+                updateModeIndicator('Terminé');
                 if (DOM.formatInfo) DOM.formatInfo.textContent = result.length.toLocaleString() + ' caractères';
                 showToast('Traitement IA terminé');
             }
@@ -822,7 +827,7 @@
                 console.log('IA interrompue');
             } else {
                 showToast('Erreur IA: ' + (e.message || 'Erreur inconnue'));
-                updateModeIndicator('❌ Échec');
+                updateModeIndicator('Échec');
             }
         } finally {
             state.isProcessingIA = false;
@@ -835,8 +840,7 @@
         }
 
         await CreditModule.useCredits('ia_processing');
-        updateCreditsDisplay(); // ← Mettre à jour l'affichage
-
+        updateCreditsDisplay();
     }
     
     // ============================================================
