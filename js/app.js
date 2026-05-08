@@ -73,17 +73,14 @@
         // Clic sur le badge → résumé
         if (DOM.creditsBadge) {
             DOM.creditsBadge.onclick = () => {
-                showToast(
-                    credits + ' crédits disponibles\n\n' +
-                    'Services :\n' +
-                    '• Dictée : 1 crédit/min\n' +
-                    '• Traduction : 3 crédits/1000 car.\n' +
-                    '• IA : 5 crédits/requête\n' +
-                    '• PDF : 2 crédits/export\n' +
-                    '• Lecture : 1 crédit/1000 car.',
-                    'info',
-                    5000
-                );
+                const services = CreditModule.config.services;
+                let msg = '💰 ' + CreditModule.currentCredits + ' crédits disponibles\n\nServices :\n';
+                
+                for (const [key, service] of Object.entries(services)) {
+                    msg += `• ${service.name} : ${service.cost} crédit(s) ${service.unit}\n`;
+                }
+                
+                showToast(msg, 'info', 6000);
             };
         }
 
@@ -593,6 +590,7 @@
 
             // Déduire les crédits et rafraîchir
             try {
+                await CreditModule.refreshPricing();
                 await CreditModule.useCredits('dictation');
                 updateCreditsDisplay();
             } catch(e) { /* silencieux */ }
@@ -600,6 +598,7 @@
             return;
         }
             try {
+            await CreditModule.refreshPricing();
             await CreditModule.canUseService('dictation');
         } catch (e) {
             showToast(e.message);
@@ -690,6 +689,7 @@
         updateModeIndicator('Traduction...');
         
         try {
+            await CreditModule.refreshPricing();
             await CreditModule.canUseService('translation');
         } catch (e) {
             showToast(e.message);
@@ -740,9 +740,11 @@
         SpeechModule.onFinish = () => {
             resetPlayButton();
             // Déduire crédits
-            CreditModule.useCredits('speech_reading')
-                .then(() => updateCreditsDisplay())
-                .catch(() => {});
+            CreditModule.refreshPricing().then(() => {
+                CreditModule.useCredits('speech_reading')
+                    .then(() => updateCreditsDisplay())
+                    .catch(() => {});
+            });
         };
         
         SpeechModule.speak(text, state.currentLang, parseFloat(state.speechRate));
@@ -778,6 +780,7 @@
         if (state.isProcessingIA) return;
 
         try {
+            await CreditModule.refreshPricing();
             await CreditModule.canUseService('ia_processing');
         } catch (e) {
             showToast(e.message);
@@ -882,7 +885,7 @@
             
             showExportPDFPopup(text, pdfIconSVG, defaultTitle);
         }, 500);
-
+        await CreditModule.refreshPricing();
         await CreditModule.useCredits('pdf_export');
         updateCreditsDisplay(); 
     }
