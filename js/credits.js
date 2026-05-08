@@ -5,11 +5,11 @@ const CreditModule = {
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpodmR5anBldnJxdGVpcnFlenRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMDY1MTAsImV4cCI6MjA5MzY4MjUxMH0.0YpMPKb7Lf3FZyM0wNpa35MZutruk6ZdIAFMKASSpvA',
         freeCredits: 10,
         services: {
-            dictation: { cost: 1, unit: 'par minute', name: 'Dictée vocale' },
-            translation: { cost: 3, unit: 'par 1000 car.', name: 'Traduction' },
-            ia_processing: { cost: 5, unit: 'par requête', name: 'Traitement IA' },
-            pdf_export: { cost: 2, unit: 'par export', name: 'Export PDF' },
-            speech_reading: { cost: 1, unit: 'par 1000 car.', name: 'Lecture audio' }
+            dictation: { cost: 5, unit: 'par minute', name: 'Dictée vocale' },
+            translation: { cost: 15, unit: 'par 1000 car.', name: 'Traduction' },
+            ia_processing: { cost: 25, unit: 'par requête', name: 'Traitement IA' },
+            pdf_export: { cost: 50, unit: 'par export', name: 'Export PDF' },
+            speech_reading: { cost: 5, unit: 'par 1000 car.', name: 'Lecture audio' }
         }
     },
 
