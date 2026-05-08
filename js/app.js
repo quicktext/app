@@ -740,11 +740,10 @@
         SpeechModule.onFinish = () => {
             resetPlayButton();
             // Déduire crédits
-            CreditModule.refreshPricing().then(() => {
-                CreditModule.useCredits('speech_reading')
-                    .then(() => updateCreditsDisplay())
-                    .catch(() => {});
-            });
+            CreditModule.useCredits('speech_reading')
+                .then(() => updateCreditsDisplay())
+                .catch(() => {});
+            
         };
         
         SpeechModule.speak(text, state.currentLang, parseFloat(state.speechRate));
