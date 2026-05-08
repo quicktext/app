@@ -858,12 +858,26 @@
     // EXPORT PDF + TXT (avec titre personnalisable)
     // ============================================================
 
-   async function handleExport() {
+    async function handleExport() {
         const text = DOM.output ? DOM.output.value : '';
-        if (!text || !text.trim()) { showToast('Aucun texte à exporter'); return; }
+        if (!text || !text.trim()) { 
+            showToast('Aucun texte à exporter'); 
+            return; 
+        }
         
+        // Étape 1 : Télécharger le TXT (gratuit)
         exportTextFile(text);
         
+        // Étape 2 : Vérifier les crédits AVANT de proposer le PDF
+        try {
+            await CreditModule.canUseService('pdf_export');
+        } catch (e) {
+            // Crédits insuffisants : pas de pop-up PDF, juste un message
+            showToast('Export TXT réussi. Crédits insuffisants pour le PDF.');
+            return;
+        }
+        
+        // Étape 3 : Crédits OK → proposer le PDF
         setTimeout(() => {
             const pdfIconSVG = `
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
@@ -883,8 +897,6 @@
             
             showExportPDFPopup(text, pdfIconSVG, defaultTitle);
         }, 500);
-        await CreditModule.useCredits('pdf_export');
-        updateCreditsDisplay(); 
     }
 
     function showExportPDFPopup(text, iconSVG, defaultTitle) {
