@@ -907,10 +907,13 @@
             padding-left: 4px;
         }
 
-        /* Overlay d'enregistrement */
+        /* Overlay d'enregistrement - centré avec backdrop */
         #registerOverlay {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background: rgba(0, 0, 0, 0.75);
             z-index: 20000;
             display: flex;
@@ -921,8 +924,9 @@
         }
 
         #registerPopup {
-            position: relative;
-            z-index: 20001;
+            width: 90%;
+            max-width: 380px;
+            animation: popupIn 0.3s ease;
         }
 
         .register-content {
@@ -930,11 +934,8 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-xl);
             padding: 30px 24px 24px;
-            width: 90%;
-            max-width: 380px;
             text-align: center;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            animation: popupIn 0.3s ease;
             max-height: 90vh;
             overflow-y: auto;
         }
@@ -1019,17 +1020,10 @@
             cursor: not-allowed;
         }
 
-        .register-skip {
-            margin-top: 12px;
-            font-size: 0.75rem;
+        .register-note {
+            margin-top: 10px;
+            font-size: 0.7rem;
             color: var(--text-muted);
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-
-        .register-skip:hover {
-            color: var(--text-secondary);
-            text-decoration: underline;
         }
     </style>
 </head>
@@ -1142,30 +1136,30 @@
         </div>
     </div>
 
-    <!-- Pop-up d'enregistrement utilisateur (premier lancement) -->
-    <div id="registerPopup" style="display: none;">
-        <div class="register-content">
-            <div class="register-icon">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-                    <circle cx="12" cy="8" r="4" stroke="#b07cc6" stroke-width="1.8" fill="none"/>
-                    <path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="#b07cc6" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-                </svg>
+    <!-- Pop-up d'enregistrement utilisateur (obligatoire au premier lancement) -->
+    <div id="registerOverlay" style="display: none;">
+        <div id="registerPopup">
+            <div class="register-content">
+                <div class="register-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+                        <circle cx="12" cy="8" r="4" stroke="#b07cc6" stroke-width="1.8" fill="none"/>
+                        <path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="#b07cc6" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h3 class="register-title">Bienvenue sur QuickText Pro</h3>
+                <p class="register-subtitle">Complétez vos informations pour commencer</p>
+                
+                <div class="register-fields">
+                    <input type="text" class="popup-input" id="regName" placeholder="Nom complet *" autocomplete="name" maxlength="100" required>
+                    <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone (ex: 696271312)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
+                    <input type="text" class="popup-input" id="regRole" placeholder="Rôle (ex: Étudiant, Enseignant, ...)" autocomplete="off" maxlength="50">
+                </div>
+                
+                <button class="register-btn" id="registerSubmit">Enregistrer</button>
+                <p class="register-note">* Champ obligatoire</p>
             </div>
-            <h3 class="register-title">Bienvenue sur QuickText Pro</h3>
-            <p class="register-subtitle">Complétez vos informations pour commencer</p>
-            
-            <div class="register-fields">
-                <input type="text" class="popup-input" id="regName" placeholder="Nom complet" autocomplete="name" maxlength="100">
-                <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone (ex: 696271312)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
-                <input type="text" class="popup-input" id="regRole" placeholder="Rôle (ex: Étudiant, Enseignant, ...)" autocomplete="off" maxlength="50">
-            </div>
-            
-            <button class="register-btn" id="registerSubmit">Enregistrer</button>
-            <p class="register-skip" id="registerSkip">Passer pour le moment</p>
         </div>
     </div>
-
-    <div id="registerOverlay" style="display: none;"></div>
     
     <script src="./js/storage.js"></script>
     <script src="./js/speech.js"></script>

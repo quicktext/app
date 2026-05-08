@@ -99,52 +99,72 @@
 
     function showRegisterPopup() {
         const overlay = document.getElementById('registerOverlay');
-        const popup = document.getElementById('registerPopup');
         
-        if (!overlay || !popup) return;
+        if (!overlay) return;
+        
+        // Vérifier si déjà complété
+        if (CreditModule.isProfileCompleted()) return;
         
         overlay.style.display = 'flex';
-        popup.style.display = 'block';
         
-        // Fermer (skip)
-        document.getElementById('registerSkip')?.addEventListener('click', () => {
-            window.storage.set('profile_completed', true);
-            overlay.style.display = 'none';
-            popup.style.display = 'none';
-        });
+        // Focus sur le champ nom
+        setTimeout(() => {
+            document.getElementById('regName')?.focus();
+        }, 400);
         
-        // Soumettre
+        // Soumettre l'enregistrement
         document.getElementById('registerSubmit')?.addEventListener('click', async () => {
             const name = document.getElementById('regName')?.value.trim();
             const phone = document.getElementById('regPhone')?.value.trim();
             const role = document.getElementById('regRole')?.value.trim();
             
+            // Le nom est obligatoire
             if (!name) {
-                showToast('Veuillez entrer votre nom');
+                showToast('Veuillez entrer votre nom complet (obligatoire).');
+                document.getElementById('regName')?.focus();
+                return;
+            }
+            
+            // Validation du téléphone si renseigné
+            if (phone && !/^[67]\d{8}$/.test(phone)) {
+                showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
+                document.getElementById('regPhone')?.focus();
                 return;
             }
             
             const btn = document.getElementById('registerSubmit');
             btn.disabled = true;
-            btn.textContent = '⏳ Enregistrement...';
+            btn.textContent = 'Enregistrement...';
             
             try {
-                await CreditModule.updateProfile(name, phone, role);
-                showToast('✅ Profil enregistré !');
+                await CreditModule.updateProfile(name, phone, role || 'Utilisateur');
+                showToast('Bienvenue ' + name + ' !');
                 overlay.style.display = 'none';
-                popup.style.display = 'none';
+                updateCreditsDisplay();
             } catch (e) {
-                showToast('Erreur: ' + e.message);
+                console.error('Erreur enregistrement :', e);
+                showToast('Erreur : ' + e.message);
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Enregistrer';
             }
         });
         
-        // Empêcher la fermeture par clic extérieur
+        // Empêcher la fermeture (obligatoire)
         overlay.addEventListener('click', (e) => {
-            e.stopPropagation();
+            if (e.target === overlay) {
+                e.stopPropagation();
+                showToast('Veuillez compléter votre inscription pour continuer.');
+            }
         });
+        
+        // Bloquer la touche Échap
+        document.addEventListener('keydown', function blockEsc(e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                showToast('Veuillez compléter votre inscription pour continuer.');
+            }
+        }, { once: false });
     }
 
     // ============================================================
