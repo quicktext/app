@@ -906,6 +906,131 @@
             font-weight: 600;
             padding-left: 4px;
         }
+
+        /* Overlay d'enregistrement */
+        #registerOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 20000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        #registerPopup {
+            position: relative;
+            z-index: 20001;
+        }
+
+        .register-content {
+            background: var(--bg-popup);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 30px 24px 24px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: popupIn 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .register-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: rgba(155, 89, 182, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .register-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--text);
+        }
+
+        .register-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .register-fields {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .register-fields .popup-input {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.85rem;
+            font-family: inherit;
+            letter-spacing: 0.2px;
+            text-align: left;
+            transition: border-color 0.2s;
+        }
+
+        .register-fields .popup-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.15);
+        }
+
+        .register-fields .popup-input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+
+        .register-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 0.3px;
+            transition: all 0.15s ease;
+        }
+
+        .register-btn:active {
+            transform: scale(0.97);
+        }
+
+        .register-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .register-skip {
+            margin-top: 12px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .register-skip:hover {
+            color: var(--text-secondary);
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -1016,6 +1141,31 @@
             <button class="popup-btn popup-btn-confirm" id="confirmRecharge">Recharger</button>
         </div>
     </div>
+
+    <!-- Pop-up d'enregistrement utilisateur (premier lancement) -->
+    <div id="registerPopup" style="display: none;">
+        <div class="register-content">
+            <div class="register-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+                    <circle cx="12" cy="8" r="4" stroke="#b07cc6" stroke-width="1.8" fill="none"/>
+                    <path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="#b07cc6" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h3 class="register-title">Bienvenue sur QuickText Pro</h3>
+            <p class="register-subtitle">Complétez vos informations pour commencer</p>
+            
+            <div class="register-fields">
+                <input type="text" class="popup-input" id="regName" placeholder="Nom complet" autocomplete="name" maxlength="100">
+                <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone (ex: 696271312)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
+                <input type="text" class="popup-input" id="regRole" placeholder="Rôle (ex: Étudiant, Enseignant, ...)" autocomplete="off" maxlength="50">
+            </div>
+            
+            <button class="register-btn" id="registerSubmit">Enregistrer</button>
+            <p class="register-skip" id="registerSkip">Passer pour le moment</p>
+        </div>
+    </div>
+
+    <div id="registerOverlay" style="display: none;"></div>
     
     <script src="./js/storage.js"></script>
     <script src="./js/speech.js"></script>

@@ -33,6 +33,10 @@
             updateCreditsDisplay();
         }
 
+        if (!CreditModule.isProfileCompleted()) {
+            setTimeout(() => showRegisterPopup(), 1000);
+        }
+
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) loadingScreen.classList.add('hidden');
         
@@ -50,7 +54,9 @@
             'apiKeyInput', 'apiKeyToggle',
             'modeIndicator', 'progressBar', 'progressFill',
             'formatInfo', 'installBtn',
-            'creditsBadge', 'creditsCount', 'rechargeBtn' 
+            'creditsBadge', 'creditsCount', 'rechargeBtn',
+            'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip',
+            'regName', 'regPhone', 'regRole'
         ];
         
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
@@ -86,6 +92,64 @@
         }
 
     }
+
+    // ============================================================
+    // POP-UP ENREGISTREMENT UTILISATEUR
+    // ============================================================
+
+    function showRegisterPopup() {
+        const overlay = document.getElementById('registerOverlay');
+        const popup = document.getElementById('registerPopup');
+        
+        if (!overlay || !popup) return;
+        
+        overlay.style.display = 'flex';
+        popup.style.display = 'block';
+        
+        // Fermer (skip)
+        document.getElementById('registerSkip')?.addEventListener('click', () => {
+            window.storage.set('profile_completed', true);
+            overlay.style.display = 'none';
+            popup.style.display = 'none';
+        });
+        
+        // Soumettre
+        document.getElementById('registerSubmit')?.addEventListener('click', async () => {
+            const name = document.getElementById('regName')?.value.trim();
+            const phone = document.getElementById('regPhone')?.value.trim();
+            const role = document.getElementById('regRole')?.value.trim();
+            
+            if (!name) {
+                showToast('Veuillez entrer votre nom');
+                return;
+            }
+            
+            const btn = document.getElementById('registerSubmit');
+            btn.disabled = true;
+            btn.textContent = '⏳ Enregistrement...';
+            
+            try {
+                await CreditModule.updateProfile(name, phone, role);
+                showToast('✅ Profil enregistré !');
+                overlay.style.display = 'none';
+                popup.style.display = 'none';
+            } catch (e) {
+                showToast('Erreur: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Enregistrer';
+            }
+        });
+        
+        // Empêcher la fermeture par clic extérieur
+        overlay.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
+    // ============================================================
+    // POP-UP RECHARGE
+    // ============================================================
 
     function showRechargePopup() {
         // Éviter deux popups simultanés

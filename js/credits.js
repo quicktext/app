@@ -100,7 +100,7 @@ const CreditModule = {
             body: JSON.stringify({ user_id: this.userID, credits: this.config.freeCredits })
         });
     },
-
+  
     // ============================================================
     // TARIFICATION (avec cache)
     // ============================================================
@@ -253,5 +253,43 @@ const CreditModule = {
         await this.syncCredits();
         // Recharger les prix aussi
         await this.loadPricing();
+    },
+
+    // ===========================================================
+    // MET A JOUR LE PROFIL UTILISATEUR
+    // ===========================================================
+
+    async updateProfile(userName, userTel, userRole) {
+        const filter = 'user_id=eq.' + encodeURIComponent(this.userID);
+        const users = await this.supabaseQuery('/rest/v1/users?select=id&' + filter);
+        
+        if (!users || users.length === 0) {
+            throw new Error('Utilisateur introuvable');
+        }
+        
+        const internalId = users[0].id;
+        
+        await this.supabaseQuery('/rest/v1/users?id=eq.' + internalId, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                user_name: userName,
+                user_tel: userTel,
+                user_role: userRole,
+            })
+        });
+        
+        // Sauvegarder en local pour ne plus afficher le pop-up
+        window.storage.set('profile_completed', true);
+        
+        console.log('✅ Profil mis à jour');
+        return true;
+    },
+
+    // ============================================================
+    // VERIFIE SI LE PROFIL EST DEJA COMPLET
+    // ============================================================
+
+    isProfileCompleted() {
+        return window.storage.get('profile_completed', false);
     }
 };
