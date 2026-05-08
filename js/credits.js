@@ -3,7 +3,7 @@ const CreditModule = {
     config: {
         apiUrl: 'https://zhvdyjpevrqteirqeztb.supabase.co',
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpodmR5anBldnJxdGVpcnFlenRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMDY1MTAsImV4cCI6MjA5MzY4MjUxMH0.0YpMPKb7Lf3FZyM0wNpa35MZutruk6ZdIAFMKASSpvA',
-        freeCredits: 10,
+        freeCredits: 100,
         cacheDuration: 300000, // 5 minutes en millisecondes
         services: {}
     },
