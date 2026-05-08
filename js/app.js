@@ -25,6 +25,7 @@
         
         // Initialiser le module de crédits
         await CreditModule.init();
+        updateCreditsDisplay();
 
         // Initialiser le module de crédits
         if (typeof CreditModule !== 'undefined') {
@@ -191,15 +192,17 @@
 
                 // Traiter la réponse
                 if (result.success) {
+
                     // Succès : crédits déjà ajoutés par l'Edge Function
                     await CreditModule.syncCredits();
+                    await CreditModule.afterRecharge(); 
                     updateCreditsDisplay();
-                    showToast('✅ Recharge réussie ! ' + result.credits_added + ' crédits ajoutés.');
+                    showToast('Recharge réussie ! ' + result.credits_added + ' crédits ajoutés.');
                     close();
                 } else {
                     // Erreur renvoyée par l'Edge Function ou MeSomb
                     const errorMsg = result.message || result.error || result.detail || 'Échec de la transaction';
-                    showToast('❌ ' + errorMsg);
+                    showToast(errorMsg);
                     console.warn('Échec recharge :', result);
                 }
 
@@ -590,7 +593,6 @@
 
             // Déduire les crédits et rafraîchir
             try {
-                await CreditModule.refreshPricing();
                 await CreditModule.useCredits('dictation');
                 updateCreditsDisplay();
             } catch(e) { /* silencieux */ }
@@ -598,7 +600,6 @@
             return;
         }
             try {
-            await CreditModule.refreshPricing();
             await CreditModule.canUseService('dictation');
         } catch (e) {
             showToast(e.message);
@@ -689,7 +690,6 @@
         updateModeIndicator('Traduction...');
         
         try {
-            await CreditModule.refreshPricing();
             await CreditModule.canUseService('translation');
         } catch (e) {
             showToast(e.message);
@@ -780,7 +780,6 @@
         if (state.isProcessingIA) return;
 
         try {
-            await CreditModule.refreshPricing();
             await CreditModule.canUseService('ia_processing');
         } catch (e) {
             showToast(e.message);
@@ -885,7 +884,6 @@
             
             showExportPDFPopup(text, pdfIconSVG, defaultTitle);
         }, 500);
-        await CreditModule.refreshPricing();
         await CreditModule.useCredits('pdf_export');
         updateCreditsDisplay(); 
     }
