@@ -406,44 +406,94 @@ const SpeechModule = (function() {
     // ============================================================
     // SYNTHÈSE VOCALE (pause/reprise par annulation + reprise)
     // ============================================================
-    function getBestVoice(lang) {
+    // ============================================================
+    // SÉLECTION DE VOIX NATURELLES
+    // ============================================================
+    function getBestVoice(lang, preferredVoiceName) {
         if (!state.availableVoices.length) loadVoices();
         const voices = state.availableVoices;
         if (!voices.length) return null;
+        
         const langPrefix = lang.split('-')[0];
-        const prefs = {
-            'fr': ['Google français', 'Microsoft Hortense', 'Amélie', 'Thomas', 'French'],
-            'en': ['Google US English', 'Microsoft David', 'Samantha', 'Alex', 'English'],
-            'es': ['Google español', 'Microsoft Helena', 'Spanish'],
-            'de': ['Google Deutsch', 'Microsoft Hedda', 'German'],
-            'it': ['Google italiano', 'Microsoft Elsa', 'Italian'],
-            'pt': ['Google português', 'Microsoft Maria', 'Portuguese'],
-            'ru': ['Google русский', 'Russian'],
-            'ja': ['Google 日本語', 'Microsoft Ayumi', 'Japanese'],
-            'zh': ['Google 中文', 'Microsoft Huihui', 'Chinese']
-        };
-        const preferred = prefs[langPrefix] || [];
-        for (const p of preferred) {
-            const voice = voices.find(v => v.lang.indexOf(langPrefix) === 0 && v.name.includes(p));
+        
+        // Si l'utilisateur a choisi une voix spécifique
+        if (preferredVoiceName && preferredVoiceName !== 'auto') {
+            const exactVoice = voices.find(v => v.name === preferredVoiceName);
+            if (exactVoice) return exactVoice;
+        }
+        
+        // Priorité aux voix "Premium" ou "Enhanced" (naturelles)
+        const qualityIndicators = [
+            'Premium', 'Enhanced', 'Natural', 'Wavenet', 'Neural', 
+            'Google français', 'Google US English', 'Microsoft',
+            'Daniel', 'Samantha', 'Karen', 'Moira', 'Fiona', 'Veena',
+            'Amélie', 'Thomas', 'Chantal', 'Nicolas'
+        ];
+        
+        // Chercher une voix de qualité dans la langue
+        for (const indicator of qualityIndicators) {
+            const voice = voices.find(v => 
+                v.lang.indexOf(langPrefix) === 0 && 
+                v.name.includes(indicator)
+            );
             if (voice) return voice;
         }
-        const fallback = voices.find(v => v.lang.indexOf(langPrefix) === 0);
-        return fallback || voices[0];
+        
+        // Chercher n'importe quelle voix dans la langue
+        const anyVoice = voices.find(v => v.lang.indexOf(langPrefix) === 0);
+        if (anyVoice) return anyVoice;
+        
+        // Fallback : voix anglaise
+        const englishVoice = voices.find(v => v.lang.indexOf('en') === 0);
+        if (englishVoice) return englishVoice;
+        
+        // Dernier recours
+        return voices[0];
     }
 
-    function speak(text, lang, rate) {
+    // ============================================================
+    // LISTE DES VOIX DISPONIBLES POUR L'INTERFACE
+    // ============================================================
+    function getAvailableVoices(lang) {
+        if (!state.availableVoices.length) loadVoices();
+        const voices = state.availableVoices;
+        if (!voices.length) return [];
+        
+        const langPrefix = lang.split('-')[0];
+        
+        // Filtrer les voix de la langue, prioriser les naturelles
+        const langVoices = voices.filter(v => v.lang.indexOf(langPrefix) === 0);
+        
+        // Trier : voix naturelles en premier
+        const naturalIndicators = ['Premium', 'Enhanced', 'Natural', 'Wavenet', 'Neural'];
+        langVoices.sort((a, b) => {
+            const aNatural = naturalIndicators.some(i => a.name.includes(i));
+            const bNatural = naturalIndicators.some(i => b.name.includes(i));
+            if (aNatural && !bNatural) return -1;
+            if (!aNatural && bNatural) return 1;
+            return a.name.localeCompare(b.name);
+        });
+        
+        return langVoices;
+    }
+
+    function speak(text, lang, rate, preferredVoiceName) {
         stopSpeaking();
         if (!text || !text.trim()) return;
+        
         const clean = text.replace(/\s+/g, ' ').replace(/\n+/g, ' ').trim();
         const segments = clean.split(/(?<=[.!?;:])\s+/).filter(s => s.trim().length > 0);
         if (!segments.length) segments.push(clean);
+        
         state.textSegments = segments;
         state.currentSegmentIndex = 0;
         state.currentSegmentCharOffset = 0;
         state.currentLang = lang;
         state.currentRate = parseFloat(rate) || 1.0;
+        state.preferredVoice = preferredVoiceName || 'auto';
         state.isPaused = false;
         state.isSpeaking = false;
+        
         speakNextSegment();
     }
 
@@ -470,7 +520,7 @@ const SpeechModule = (function() {
         utterance.rate = Math.min(state.currentRate, 0.95);
         utterance.pitch = 0.9;
         utterance.volume = 1.0;
-        const voice = getBestVoice(state.currentLang);
+        const voice = getBestVoice(state.currentLang, state.preferredVoice);
         if (voice) utterance.voice = voice;
 
         utterance.onboundary = (event) => {
@@ -545,6 +595,15 @@ const SpeechModule = (function() {
         onResume: null,
         onStop: null,
         onFinish: null,
-        onError: null
+        onError: null,
+        getVoicesForLang: function(lang) {
+            const langPrefix = lang.split('-')[0];
+            const voices = speechSynthesis.getVoices();
+            
+            // Forcer le chargement si vide
+            if (voices.length === 0) return [];
+            
+            return voices.filter(v => v.lang.indexOf(langPrefix) === 0);
+        }
     };
 })();

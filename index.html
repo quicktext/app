@@ -626,7 +626,12 @@
         /* ============================================================
            CONTROLS
            ============================================================ */
-        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px 0; }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr; /* 4 colonnes au lieu de 3 */
+            gap: 8px;
+            padding: 10px 0;
+        }
         .control-group { display: flex; flex-direction: column; gap: 3px; }
         
         .control-label {
@@ -796,17 +801,16 @@
             .app-header { padding-top: calc(12px + env(safe-area-inset-top)); }
         }
         
-        @media (max-width: 380px) {
-            .controls { grid-template-columns: 1fr 1fr; }
-            .toolbar-top { gap: 4px; }
-            .btn-tool { padding: 6px 8px; font-size: 0.7rem; gap: 4px; }
+        @media (max-width: 500px) {
+            .controls {
+                grid-template-columns: 1fr 1fr; /* 2 colonnes sur mobile */
+            }
         }
-        
-        @media (min-width: 500px) {
-            #app { padding: 0 20px; }
-            .btn-main { font-size: 0.75rem; }
-            .btn-main .main-icon { width: 28px; height: 28px; }
-            .text-area { min-height: 280px; font-size: 0.95rem; }
+
+        @media (min-width: 501px) and (max-width: 700px) {
+            .controls {
+                grid-template-columns: 1fr 1fr 1fr; /* 3 colonnes sur tablette */
+            }
         }
 
         .credits-badge {
@@ -1083,6 +1087,7 @@
             <div class="control-group"><label for="langSelect" class="control-label">Langue</label><select id="langSelect" class="select-input"><option value="fr-FR">🇫🇷 Français</option><option value="en-US">🇺🇸 English</option><option value="es-ES">🇪🇸 Español</option><option value="de-DE">🇩🇪 Deutsch</option><option value="it-IT">🇮🇹 Italiano</option><option value="pt-PT">🇵🇹 Português</option><option value="ru-RU">🇷🇺 Русский</option><option value="ja-JP">🇯🇵 日本語</option><option value="zh-CN">🇨🇳 中文</option></select></div>
             <div class="control-group"><label for="speedSelect" class="control-label">Vitesse</label><select id="speedSelect" class="select-input"><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="0.9">0.9x</option><option value="1.0" selected>1x</option><option value="1.1">1.1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2.0">2x</option></select></div>
             <div class="control-group"><label for="actionSelect" class="control-label">Action IA</label><select id="actionSelect" class="select-input"><option value="formatting" selected>Correction</option><option value="summarize">Synthèse</option><option value="reading">Étudier</option><option value="memory">Mémo</option></select></div>
+            <div class="control-group"><label for="voiceSelect" class="control-label">Voix Lecture</label><select id="voiceSelect" class="select-input"><option value="auto">Auto (meilleure voix)</option></select></div>
         </div>
         
         <div class="api-config">

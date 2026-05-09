@@ -15,6 +15,78 @@
     };
     
     const DOM = {};
+
+        function populateVoiceList(lang) {
+            if (!DOM.voiceSelect) return;
+            
+            // Sauvegarder la sélection actuelle
+            const currentValue = DOM.voiceSelect.value;
+            
+            // Vider la liste
+            DOM.voiceSelect.innerHTML = '';
+            
+            // Option par défaut
+            const autoOption = document.createElement('option');
+            autoOption.value = 'auto';
+            autoOption.textContent = '🎙️ Auto (meilleure voix)';
+            DOM.voiceSelect.appendChild(autoOption);
+            
+            // Essayer de charger les voix
+            let voices = [];
+            
+            if ('speechSynthesis' in window) {
+                voices = speechSynthesis.getVoices();
+            }
+            
+            // Si aucune voix n'est chargée, forcer le chargement
+            if (voices.length === 0) {
+                // Déclencher le chargement des voix
+                speechSynthesis.getVoices();
+                
+                // Attendre le chargement
+                speechSynthesis.onvoiceschanged = () => {
+                    populateVoiceList(lang);
+                };
+                return;
+            }
+            
+            const langPrefix = lang.split('-')[0];
+            const langVoices = voices.filter(v => v.lang.indexOf(langPrefix) === 0);
+            
+            // Si aucune voix pour cette langue, afficher toutes les voix
+            const voicesToShow = langVoices.length > 0 ? langVoices : voices;
+            
+            // Indicateurs de voix naturelles (plus complets)
+            const naturalIndicators = [
+                'Premium', 'Enhanced', 'Natural', 'Wavenet', 'Neural',
+                'Google', 'Microsoft', 'Amazon',
+                'Daniel', 'Samantha', 'Karen', 'Moira', 'Fiona', 'Veena',
+                'Amélie', 'Thomas', 'Chantal', 'Nicolas', 'Audrey', 'Aurelie'
+            ];
+            
+            // Trier : naturelles d'abord, puis alphabétique
+            voicesToShow.sort((a, b) => {
+                const aNatural = naturalIndicators.some(i => a.name.includes(i));
+                const bNatural = naturalIndicators.some(i => b.name.includes(i));
+                if (aNatural && !bNatural) return -1;
+                if (!aNatural && bNatural) return 1;
+                return a.name.localeCompare(b.name);
+            });
+            
+            voicesToShow.forEach(voice => {
+                const isNatural = naturalIndicators.some(i => voice.name.includes(i));
+                const prefix = isNatural ? '🌟 ' : '   ';
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = prefix + voice.name + ' (' + voice.lang + ')';
+                DOM.voiceSelect.appendChild(option);
+            });
+            
+            // Restaurer la sélection précédente
+            if (currentValue && DOM.voiceSelect.querySelector(`option[value="${currentValue}"]`)) {
+                DOM.voiceSelect.value = currentValue;
+            }
+        }    
     
     async function init() {
         cacheDOM();
@@ -22,10 +94,35 @@
         setupEvents();
         setupPWA();
         loadVoices();
+        // Peupler la liste des voix après chargement
+        setTimeout(() => {
+            populateVoiceList(state.currentLang);
+        }, 500);
         
         // Initialiser le module de crédits
         await CreditModule.init();
         updateCreditsDisplay();
+
+        // Forcer le chargement des voix
+        if ('speechSynthesis' in window) {
+            // Déclencher un premier appel pour initialiser
+            speechSynthesis.getVoices();
+            
+            // Attendre le chargement des voix
+            speechSynthesis.onvoiceschanged = () => {
+                populateVoiceList(state.currentLang);
+            };
+            
+            // Si les voix sont déjà chargées (certains navigateurs)
+            if (speechSynthesis.getVoices().length > 0) {
+                populateVoiceList(state.currentLang);
+            }
+        }
+        
+        // Double appel après un délai (sécurité)
+        setTimeout(() => {
+            populateVoiceList(state.currentLang);
+        }, 1000);
 
         // Initialiser le module de crédits
         if (typeof CreditModule !== 'undefined') {
@@ -56,7 +153,8 @@
             'formatInfo', 'installBtn',
             'creditsBadge', 'creditsCount', 'rechargeBtn',
             'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip',
-            'regName', 'regPhone', 'regRole'
+            'regName', 'regPhone', 'regRole',
+            'voiceSelect'
         ];
         
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
@@ -334,6 +432,9 @@
             DOM.output.value = savedText;
             state.fullTranscript = savedText;
         }
+
+        const savedVoice = window.storage.get('preferredVoice', 'auto');
+        if (DOM.voiceSelect) DOM.voiceSelect.value = savedVoice;
     }
     
     function setupEvents() {
@@ -392,6 +493,28 @@
             });
         }
         
+        if (DOM.langSelect) {
+            DOM.langSelect.addEventListener('change', (e) => {
+                state.currentLang = e.target.value;
+                window.storage.set('selectedLang', state.currentLang);
+                
+                // Rafraîchir la liste des voix
+                populateVoiceList(state.currentLang);
+                
+                if (SpeechModule.isSpeaking || SpeechModule.isPaused) {
+                    SpeechModule.stopSpeaking();
+                    resetPlayButton();
+                }
+            });
+        }
+
+        if (DOM.voiceSelect) {
+            DOM.voiceSelect.addEventListener('change', (e) => {
+                const selectedVoice = e.target.value;
+                window.storage.set('preferredVoice', selectedVoice);
+            });
+        }
+
         if (DOM.actionSelect) {
             DOM.actionSelect.addEventListener('change', (e) => {
                 state.selectedAction = e.target.value;
@@ -437,6 +560,7 @@
             window.storage.set('selectedLang', state.currentLang);
             window.storage.set('selectedAction', state.selectedAction);
         });
+
     }
     
     // ============================================================
@@ -811,26 +935,43 @@
     }
     
     function toggleSpeech() {
-        if (SpeechModule.isSpeaking && !SpeechModule.isPaused) { SpeechModule.pauseSpeaking(); return; }
-        if (SpeechModule.isPaused) { SpeechModule.resumeSpeaking(); return; }
+        if (SpeechModule.isSpeaking && !SpeechModule.isPaused) { 
+            SpeechModule.pauseSpeaking(); 
+            return; 
+        }
+        if (SpeechModule.isPaused) { 
+            SpeechModule.resumeSpeaking(); 
+            return; 
+        }
         
         const text = DOM.output ? DOM.output.value : '';
-        if (!text || !text.trim()) { showToast('Aucun texte à lire'); return; }
+        if (!text || !text.trim()) { 
+            showToast('Aucun texte à lire'); 
+            return; 
+        }
         
-        SpeechModule.onStart = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Pause'; };
-        SpeechModule.onPause = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Reprendre'; };
-        SpeechModule.onResume = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Pause'; };
-        SpeechModule.onStop = resetPlayButton;
-        SpeechModule.onFinish = () => {
-            resetPlayButton();
-            // Déduire crédits
-            CreditModule.useCredits('speech_reading')
-                .then(() => updateCreditsDisplay())
-                .catch(() => {});
+        // Vérifier les crédits
+        CreditModule.canUseService('speech_reading').then(() => {
+            SpeechModule.onStart = () => { 
+                if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Pause'; 
+            };
+            SpeechModule.onPause = () => { 
+                if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Reprendre'; 
+            };
+            SpeechModule.onResume = () => { 
+                if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Pause'; 
+            };
+            SpeechModule.onStop = resetPlayButton;
+            SpeechModule.onFinish = () => {
+                resetPlayButton();
+                CreditModule.useCredits('speech_reading').then(() => updateCreditsDisplay()).catch(() => {});
+            };
             
-        };
-        
-        SpeechModule.speak(text, state.currentLang, parseFloat(state.speechRate));
+            const preferredVoice = DOM.voiceSelect ? DOM.voiceSelect.value : 'auto';
+            SpeechModule.speak(text, state.currentLang, parseFloat(state.speechRate), preferredVoice);
+        }).catch(e => {
+            showToast(e.message);
+        });
     }
     
     function stopSpeech() {
