@@ -196,73 +196,88 @@
     // ============================================================
 
     function showRegisterPopup() {
-        const overlay = document.getElementById('registerOverlay');
-        
-        if (!overlay) return;
-        
         // Vérifier si déjà complété
         if (CreditModule.isProfileCompleted()) return;
+        
+        const overlay = document.getElementById('registerOverlay');
+        if (!overlay) return;
         
         overlay.style.display = 'flex';
         
         // Focus sur le champ nom
         setTimeout(() => {
-            document.getElementById('regName')?.focus();
+            const nameInput = document.getElementById('regName');
+            if (nameInput) nameInput.focus();
         }, 400);
         
-        // Soumettre l'enregistrement
-        document.getElementById('registerSubmit')?.addEventListener('click', async () => {
-            const name = document.getElementById('regName')?.value.trim();
-            const phone = document.getElementById('regPhone')?.value.trim();
-            const role = document.getElementById('regRole')?.value.trim();
-            
-            // Le nom est obligatoire
-            if (!name) {
-                showToast('Veuillez entrer votre nom complet (obligatoire).');
-                document.getElementById('regName')?.focus();
-                return;
-            }
-            
-            // Validation du téléphone si renseigné
-            if (phone && !/^[67]\d{8}$/.test(phone)) {
-                showToast('📱 Numéro invalide. Format : 69xxxxxxx (9 chiffres).');
-                document.getElementById('regPhone')?.focus();
-                return;
-            }
-            
-            const btn = document.getElementById('registerSubmit');
-            btn.disabled = true;
-            btn.textContent = 'Enregistrement...';
-            
-            try {
-                await CreditModule.updateProfile(name, phone, role || 'Utilisateur');
-                showToast('Bienvenue ' + name + ' !');
-                overlay.style.display = 'none';
-                updateCreditsDisplay();
-            } catch (e) {
-                console.error('Erreur enregistrement :', e);
-                showToast('Erreur : ' + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Enregistrer';
-            }
-        });
+        // Fonction de nettoyage
+        function cleanup() {
+            overlay.style.display = 'none';
+            // Supprimer l'overlay du DOM après un court délai
+            setTimeout(() => {
+                if (overlay.parentNode) {
+                    overlay.remove();
+                }
+            }, 300);
+        }
         
-        // Empêcher la fermeture (obligatoire)
+        // Soumettre l'enregistrement
+        const submitBtn = document.getElementById('registerSubmit');
+        if (submitBtn) {
+            // Supprimer les anciens listeners en clonant
+            const newBtn = submitBtn.cloneNode(true);
+            submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+            
+            newBtn.addEventListener('click', async () => {
+                const name = document.getElementById('regName')?.value.trim();
+                const phone = document.getElementById('regPhone')?.value.trim();
+                const role = document.getElementById('regRole')?.value.trim();
+                
+                if (!name) {
+                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
+                    document.getElementById('regName')?.focus();
+                    return;
+                }
+                
+                if (phone && !/^[67]\d{8}$/.test(phone)) {
+                    showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
+                    document.getElementById('regPhone')?.focus();
+                    return;
+                }
+                
+                newBtn.disabled = true;
+                newBtn.textContent = '⏳ Enregistrement...';
+                
+                try {
+                    await CreditModule.updateProfile(name, phone, role || 'Utilisateur');
+                    showToast('✅ Bienvenue ' + name + ' !');
+                    cleanup();
+                    updateCreditsDisplay();
+                    
+                    // Vérifier si le bouton Installer doit s'afficher
+                    if (DOM.installBtn) {
+                        const deferredPrompt = window._deferredPrompt;
+                        if (deferredPrompt) {
+                            DOM.installBtn.style.display = 'inline-flex';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Erreur enregistrement :', e);
+                    showToast('❌ Erreur : ' + e.message);
+                } finally {
+                    newBtn.disabled = false;
+                    newBtn.textContent = 'Enregistrer';
+                }
+            });
+        }
+        
+        // Empêcher la fermeture
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 e.stopPropagation();
-                showToast('Veuillez compléter votre inscription pour continuer.');
+                showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
             }
         });
-        
-        // Bloquer la touche Échap
-        document.addEventListener('keydown', function blockEsc(e) {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                showToast('Veuillez compléter votre inscription pour continuer.');
-            }
-        }, { once: false });
     }
 
     // ============================================================
@@ -1435,34 +1450,37 @@
     // PWA
     // ============================================================
     
-   function setupPWA() {
-        let deferredPrompt;
+    function setupPWA() {
+        window._deferredPrompt = null; // ← Stocker globalement
         
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
-            deferredPrompt = e;
-            if (DOM.installBtn) DOM.installBtn.style.display = 'block';
+            window._deferredPrompt = e; // ← Sauvegarder
+            
+            // Afficher le bouton seulement si l'enregistrement est fait
+            if (CreditModule.isProfileCompleted() && DOM.installBtn) {
+                DOM.installBtn.style.display = 'inline-flex';
+            }
         });
         
         if (DOM.installBtn) {
             DOM.installBtn.addEventListener('click', async () => {
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    await deferredPrompt.userChoice;
-                    deferredPrompt = null;
+                if (window._deferredPrompt) {
+                    window._deferredPrompt.prompt();
+                    const { outcome } = await window._deferredPrompt.userChoice;
+                    window._deferredPrompt = null;
                     DOM.installBtn.style.display = 'none';
+                    console.log('PWA installée :', outcome);
                 } else {
                     showToast('Utilisez le menu du navigateur pour installer.');
                 }
             });
         }
         
-        // Enregistrement du Service Worker avec détection du chemin
+        // Service Worker
         if ('serviceWorker' in navigator) {
-            // Détecter le bon chemin de base (racine ou sous-dossier)
             const basePath = location.pathname.replace(/\/[^/]*$/, '');
             const swPath = basePath ? basePath + '/sw.js' : './sw.js';
-            
             navigator.serviceWorker.register(swPath)
                 .then(reg => console.log('SW OK:', reg.scope))
                 .catch(err => console.warn('SW err:', err));
