@@ -154,7 +154,8 @@
             'creditsBadge', 'creditsCount', 'rechargeBtn',
             'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip',
             'regName', 'regPhone', 'regRole',
-            'voiceSelect'
+            'voiceSelect',
+            'adminDashboardOverlay', 'adminCloseBtn', 'filterName', 'filterPhone', 'filterBtn', 'resetFilterBtn'
         ];
         
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
@@ -190,6 +191,137 @@
         }
 
     }
+
+    // ============================================================
+    // TABLEAU DE BORD ADMINISTRATEUR
+    // ============================================================
+
+    async function openAdminDashboard() {
+        const overlay = document.getElementById('adminDashboardOverlay');
+        if (!overlay) return;
+
+        // Ne pas afficher le dashboard tant qu'on n'a pas la confirmation
+        // overlay.style.display = 'flex';  ← SUPPRIMER CETTE LIGNE
+
+        try {
+            const response = await fetch(
+                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/admin-dashboard',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                        'apikey': CreditModule.config.anonKey,
+                    },
+                    body: JSON.stringify({
+                        action: 'getDashboard',
+                        userId: CreditModule.userID,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Afficher SEULEMENT si l'admin est confirmé
+                overlay.style.display = 'flex';
+                updateAdminStats(result.data);
+            } else {
+                // Admin refusé : ne jamais afficher le dashboard
+                showToast((result.error || 'Accès refusé'));
+                // S'assurer que l'overlay est bien caché
+                overlay.style.display = 'none';
+            }
+        } catch (e) {
+            showToast('Erreur : ' + e.message);
+            overlay.style.display = 'none';
+        }
+    }
+
+    function closeAdminDashboard() {
+        const overlay = document.getElementById('adminDashboardOverlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    async function loadAdminDashboard(isFiltered) {
+        const searchName = DOM.filterName?.value.trim() || '';
+        const searchPhone = DOM.filterPhone?.value.trim() || '';
+        
+        if (isFiltered && !searchName && !searchPhone) {
+            showToast('Entrez un nom ou un numéro pour filtrer');
+            return;
+        }
+        
+        try {
+            const response = await fetch(
+                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/admin-dashboard',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                        'apikey': CreditModule.config.anonKey,
+                    },
+                    body: JSON.stringify({
+                        action: 'getDashboard',
+                        userId: CreditModule.userID,
+                        searchName: searchName || null,
+                        searchPhone: searchPhone || null,
+                    }),
+                }
+            );
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                updateAdminStats(result.data);
+            } else {
+                showToast('Erreur : ' + (result.error || 'Chargement échoué'));
+            }
+        } catch (e) {
+            showToast('Erreur réseau');
+        }
+    }
+
+    function updateAdminStats(data) {
+        const { stats, users } = data;
+        
+        // Mise à jour des cartes statistiques
+        const statUsers = document.getElementById('statUsers');
+        const statPurchased = document.getElementById('statPurchased');
+        const statUsed = document.getElementById('statUsed');
+        const statUnused = document.getElementById('statUnused');
+        const statAmount = document.getElementById('statAmount');
+        
+        if (statUsers) statUsers.textContent = stats.totalUsers;
+        if (statPurchased) statPurchased.textContent = stats.totalCreditsPurchased;
+        if (statUsed) statUsed.textContent = stats.totalCreditsUsed;
+        if (statUnused) statUnused.textContent = stats.totalCreditsUnused;
+        if (statAmount) statAmount.textContent = stats.totalAmountXAF.toLocaleString() + ' XAF';
+        
+        // Mise à jour du tableau
+        const tbody = document.getElementById('adminTableBody');
+        if (!tbody) return;
+        
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Aucun utilisateur trouvé</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = users.map(u => `
+            <tr>
+                <td>${escapeHTML(u.user_name)}</td>
+                <td>${escapeHTML(u.user_tel)}</td>
+                <td><span class="role-badge role-${(u.user_role || 'user').toLowerCase()}">${escapeHTML(u.user_role || 'user')}</span></td>
+                <td>${u.credits}</td>
+                <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
+            </tr>
+        `).join('');
+    }
+
+    // ============================================================
+    // ⬆️ FIN TABLEAU DE BORD ⬆️
+    // ============================================================
 
     // ============================================================
     // POP-UP ENREGISTREMENT UTILISATEUR
@@ -558,6 +690,26 @@
             });
         }
         
+        // Clic sur le logo → tableau de bord admin
+        const headerLogo = document.querySelector('.header-logo');
+        if (headerLogo) {
+            headerLogo.style.cursor = 'pointer';
+            headerLogo.addEventListener('click', () => openAdminDashboard());
+        }
+
+        // Fermer le tableau de bord
+        if (DOM.adminCloseBtn) {
+            DOM.adminCloseBtn.addEventListener('click', closeAdminDashboard);
+        }
+
+        // Filtres
+        if (DOM.filterBtn) DOM.filterBtn.addEventListener('click', () => loadAdminDashboard(true));
+        if (DOM.resetFilterBtn) DOM.resetFilterBtn.addEventListener('click', () => {
+            if (DOM.filterName) DOM.filterName.value = '';
+            if (DOM.filterPhone) DOM.filterPhone.value = '';
+            loadAdminDashboard(false);
+        });
+
         window.addEventListener('beforeunload', () => {
             if (DOM.output) window.storage.setSession('currentText', DOM.output.value);
             window.storage.set('speechRate', state.speechRate);

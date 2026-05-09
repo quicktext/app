@@ -1057,6 +1057,182 @@
             transform: scale(0.95);
             background: rgba(155, 89, 182, 0.35);
         }
+
+        /* Tableau de bord admin */
+        #adminDashboardOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 30000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        #adminDashboard {
+            background: var(--bg-popup);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            width: 95%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: popupIn 0.3s ease;
+        }
+
+        .admin-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .admin-header h2 {
+            font-size: 1.2rem;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .admin-close-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .admin-close-btn:hover {
+            background: rgba(231, 76, 60, 0.2);
+            color: #f08080;
+        }
+
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 700px) {
+            .admin-stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 400px) {
+            .admin-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 14px 10px;
+            text-align: center;
+        }
+
+        .stat-card.highlight {
+            background: rgba(155, 89, 182, 0.1);
+            border-color: rgba(155, 89, 182, 0.3);
+        }
+
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .stat-card.highlight .stat-value {
+            color: var(--accent-light);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .admin-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .admin-filters .popup-input {
+            flex: 1;
+            min-width: 150px;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.8rem;
+            font-family: inherit;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .filter-btn-secondary {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .admin-table-container {
+            overflow-x: auto;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .admin-table th {
+            background: rgba(255,255,255,0.04);
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .admin-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text);
+        }
+
+        .admin-table tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
     </style>
 </head>
 <body>
@@ -1191,6 +1367,67 @@
         </div>
     </div>
     
+    <!-- Tableau de bord administrateur -->
+    <div id="adminDashboardOverlay" style="display: none;">
+        <div id="adminDashboard">
+            <div class="admin-header">
+                <h2>Tableau de bord</h2>
+                <button id="adminCloseBtn" class="admin-close-btn" title="Fermer">
+                    <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="admin-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="statUsers">0</div>
+                    <div class="stat-label">Utilisateurs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statPurchased">0</div>
+                    <div class="stat-label">Crédits achetés</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statUsed">0</div>
+                    <div class="stat-label">Crédits utilisés</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statUnused">0</div>
+                    <div class="stat-label">Crédits restants</div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="stat-value" id="statAmount">0 XAF</div>
+                    <div class="stat-label">Montant total</div>
+                </div>
+            </div>
+            
+            <div class="admin-filters">
+                <input type="text" class="popup-input" id="filterName" placeholder="🔍 Filtrer par nom...">
+                <input type="tel" class="popup-input" id="filterPhone" placeholder="📱 Filtrer par téléphone...">
+                <button id="filterBtn" class="filter-btn">Filtrer</button>
+                <button id="resetFilterBtn" class="filter-btn filter-btn-secondary">Réinitialiser</button>
+            </div>
+            
+            <div class="admin-table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Téléphone</th>
+                            <th>Rôle</th>
+                            <th>Crédits</th>
+                            <th>Inscription</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminTableBody">
+                        <tr><td colspan="5" style="text-align:center;padding:20px;">Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script src="./js/storage.js"></script>
     <script src="./js/speech.js"></script>
     <script src="./js/translation.js"></script>
