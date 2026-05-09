@@ -43,6 +43,61 @@ const SpeechModule = (function() {
         finalSegments: []   // liste des segments formatés (avec ponctuation)
     };
 
+    // Dans SpeechModule, ajoutez cette fonction :
+
+    async function speakWithGoogleTTS(text, lang, rate) {
+        stopSpeaking();
+        if (!text || !text.trim()) return;
+        
+        const langCode = lang.split('-')[0];
+        state.currentLang = lang;
+        state.currentRate = parseFloat(rate) || 1.0;
+        state.isSpeaking = true;
+        state.isPaused = false;
+        
+        if (SpeechModule.onStart) SpeechModule.onStart();
+        
+        try {
+            const maxChars = 200;
+            const segments = [];
+            
+            // Découper en segments
+            for (let i = 0; i < text.length; i += maxChars) {
+                segments.push(text.substring(i, i + maxChars));
+            }
+            
+            for (let i = 0; i < segments.length; i++) {
+                if (!state.isSpeaking || state.isPaused) break;
+                
+                const segment = segments[i];
+                const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(segment)}&tl=${langCode}&client=tw-ob&ttsspeed=${rate}`;
+                
+                const audio = new Audio();
+                audio.src = url;
+                audio.volume = 1.0;
+                
+                await new Promise((resolve, reject) => {
+                    audio.onended = resolve;
+                    audio.onerror = reject;
+                    audio.play().catch(reject);
+                });
+            }
+            
+            state.isSpeaking = false;
+            if (SpeechModule.onFinish) SpeechModule.onFinish();
+            
+        } catch (e) {
+            console.error('Erreur TTS:', e);
+            state.isSpeaking = false;
+            // Fallback sur la synthèse vocale locale
+            speakFallback(text, lang, rate);
+        }
+    }
+
+    function speakFallback(text, lang, rate) {
+        speak(text, lang, rate);
+    }
+
     // ============================================================
     // INIT VOIX
     // ============================================================
