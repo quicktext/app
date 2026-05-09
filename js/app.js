@@ -226,33 +226,35 @@
                 const role = document.getElementById('regRole')?.value.trim();
                 
                 if (!name) {
-                    showToast('⚠️ Veuillez entrer votre nom complet.');
+                    showToast('Veuillez entrer votre nom complet.');
                     document.getElementById('regName')?.focus();
                     return;
                 }
                 
                 if (phone && !/^[67]\d{8}$/.test(phone)) {
-                    showToast('📱 Numéro invalide. Format : 696271312.');
+                    showToast('Numéro invalide. Format : 696271312.');
                     document.getElementById('regPhone')?.focus();
                     return;
                 }
                 
                 submitBtn.disabled = true;
-                submitBtn.textContent = '⏳ Enregistrement...';
+                submitBtn.textContent = 'Enregistrement...';
                 
                 try {
                     await CreditModule.updateProfile(name, phone, role || 'Utilisateur');
-                    showToast('✅ Bienvenue ' + name + ' !');
+                    showToast('Bienvenue ' + name + ' !');
                     cleanup();
                     updateCreditsDisplay();
                     
-                    // Afficher le bouton installer si disponible
-                    if (DOM.installBtn && window._deferredPrompt) {
-                        DOM.installBtn.style.display = 'inline-flex';
+                    // Afficher le bouton installer après enregistrement
+                    if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
+                        setTimeout(() => {
+                            DOM.installBtn.style.display = 'inline-flex';
+                        }, 500);
                     }
                 } catch (e) {
                     console.error('Erreur enregistrement :', e);
-                    showToast('❌ Erreur : ' + e.message);
+                    showToast('Erreur : ' + e.message);
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Enregistrer';
                 }
@@ -1438,31 +1440,70 @@
     // ============================================================
     
     function setupPWA() {
-        window._deferredPrompt = null; // ← Stocker globalement
+        window._deferredPrompt = null;
         
+        // Ne rien faire si déjà installée
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('App déjà installée');
+            return;
+        }
+        
+        // Événement d'installation
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
-            window._deferredPrompt = e; // ← Sauvegarder
+            window._deferredPrompt = e;
+            console.log('Événement install prêt');
             
-            // Afficher le bouton seulement si l'enregistrement est fait
-            if (CreditModule.isProfileCompleted() && DOM.installBtn) {
+            // Afficher le bouton immédiatement
+            if (DOM.installBtn) {
                 DOM.installBtn.style.display = 'inline-flex';
             }
         });
         
+        // App installée
+        window.addEventListener('appinstalled', () => {
+            console.log('App installée avec succès');
+            window._deferredPrompt = null;
+            if (DOM.installBtn) {
+                DOM.installBtn.style.display = 'none';
+            }
+        });
+        
+        // Clic sur le bouton
         if (DOM.installBtn) {
             DOM.installBtn.addEventListener('click', async () => {
                 if (window._deferredPrompt) {
                     window._deferredPrompt.prompt();
                     const { outcome } = await window._deferredPrompt.userChoice;
+                    console.log('Résultat installation :', outcome);
                     window._deferredPrompt = null;
                     DOM.installBtn.style.display = 'none';
-                    console.log('PWA installée :', outcome);
                 } else {
-                    showToast('Utilisez le menu du navigateur pour installer.');
+                    // Instructions manuelles
+                    const isAndroid = /android/i.test(navigator.userAgent);
+                    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                    
+                    if (isIOS) {
+                        showToast('iOS : appuyez sur Partager → Sur l\'écran d\'accueil');
+                    } else if (isAndroid) {
+                        showToast('Android : menu ⋮ → Installer l\'application');
+                    } else {
+                        showToast('Menu du navigateur → Installer');
+                    }
                 }
             });
         }
+        
+        // Afficher le bouton après 2 secondes si tout est OK
+        setTimeout(() => {
+            if (DOM.installBtn && CreditModule.isProfileCompleted()) {
+                // Vérifier que l'app n'est pas déjà installée
+                if (!window.matchMedia('(display-mode: standalone)').matches) {
+                    DOM.installBtn.style.display = 'inline-flex';
+                    console.log('Bouton installer affiché (fallback)');
+                }
+            }
+        }, 2000);
         
         // Service Worker
         if ('serviceWorker' in navigator) {
