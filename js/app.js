@@ -75,7 +75,7 @@
             
             voicesToShow.forEach(voice => {
                 const isNatural = naturalIndicators.some(i => voice.name.includes(i));
-                const prefix = isNatural ? '🌟 ' : '   ';
+                const prefix = isNatural ? ' ' : '   ';
                 const option = document.createElement('option');
                 option.value = voice.name;
                 option.textContent = prefix + voice.name + ' (' + voice.lang + ')';
@@ -264,7 +264,7 @@
         // Bloquer la fermeture
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                showToast('⚠️ Veuillez compléter votre inscription.');
+                showToast('Veuillez compléter votre inscription.');
             }
         });
     }
@@ -333,7 +333,7 @@
             // Désactiver le bouton pour éviter double clic
             const confirmBtn = overlay.querySelector('#confirmRecharge');
             confirmBtn.disabled = true;
-            confirmBtn.textContent = '⏳ Patientez...';
+            confirmBtn.textContent = 'Patientez...';
 
             // Timeout de 45 secondes
             const controller = new AbortController();

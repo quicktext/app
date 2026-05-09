@@ -179,7 +179,7 @@ const CreditModule = {
         if (!hasCredits) {
             const serviceName = this.getServiceName(service);
             throw new Error(
-                '💰 Crédits insuffisants !\n\n' +
+                'Crédits insuffisants !\n\n' +
                 'Service : ' + serviceName + '\n' +
                 'Coût : ' + cost + ' crédit(s)\n' +
                 'Vos crédits : ' + this.currentCredits + '\n\n' +
