@@ -196,7 +196,6 @@
     // ============================================================
 
     function showRegisterPopup() {
-        // Vérifier si déjà complété
         if (CreditModule.isProfileCompleted()) return;
         
         const overlay = document.getElementById('registerOverlay');
@@ -204,49 +203,42 @@
         
         overlay.style.display = 'flex';
         
-        // Focus sur le champ nom
         setTimeout(() => {
             const nameInput = document.getElementById('regName');
             if (nameInput) nameInput.focus();
         }, 400);
         
-        // Fonction de nettoyage
         function cleanup() {
             overlay.style.display = 'none';
-            // Supprimer l'overlay du DOM après un court délai
             setTimeout(() => {
-                if (overlay.parentNode) {
-                    overlay.remove();
-                }
+                if (overlay.parentNode) overlay.remove();
             }, 300);
         }
         
-        // Soumettre l'enregistrement
+        // Utiliser addEventListener une seule fois avec { once: true }
         const submitBtn = document.getElementById('registerSubmit');
         if (submitBtn) {
-            // Supprimer les anciens listeners en clonant
-            const newBtn = submitBtn.cloneNode(true);
-            submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-            
-            newBtn.addEventListener('click', async () => {
+            submitBtn.addEventListener('click', async function handler(e) {
+                e.preventDefault();
+                
                 const name = document.getElementById('regName')?.value.trim();
                 const phone = document.getElementById('regPhone')?.value.trim();
                 const role = document.getElementById('regRole')?.value.trim();
                 
                 if (!name) {
-                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
+                    showToast('⚠️ Veuillez entrer votre nom complet.');
                     document.getElementById('regName')?.focus();
                     return;
                 }
                 
                 if (phone && !/^[67]\d{8}$/.test(phone)) {
-                    showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
+                    showToast('📱 Numéro invalide. Format : 696271312.');
                     document.getElementById('regPhone')?.focus();
                     return;
                 }
                 
-                newBtn.disabled = true;
-                newBtn.textContent = '⏳ Enregistrement...';
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Enregistrement...';
                 
                 try {
                     await CreditModule.updateProfile(name, phone, role || 'Utilisateur');
@@ -254,28 +246,23 @@
                     cleanup();
                     updateCreditsDisplay();
                     
-                    // Vérifier si le bouton Installer doit s'afficher
-                    if (DOM.installBtn) {
-                        const deferredPrompt = window._deferredPrompt;
-                        if (deferredPrompt) {
-                            DOM.installBtn.style.display = 'inline-flex';
-                        }
+                    // Afficher le bouton installer si disponible
+                    if (DOM.installBtn && window._deferredPrompt) {
+                        DOM.installBtn.style.display = 'inline-flex';
                     }
                 } catch (e) {
                     console.error('Erreur enregistrement :', e);
                     showToast('❌ Erreur : ' + e.message);
-                } finally {
-                    newBtn.disabled = false;
-                    newBtn.textContent = 'Enregistrer';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enregistrer';
                 }
-            });
+            }, { once: false }); // Permet de réessayer si erreur
         }
         
-        // Empêcher la fermeture
+        // Bloquer la fermeture
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                e.stopPropagation();
-                showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
+                showToast('⚠️ Veuillez compléter votre inscription.');
             }
         });
     }

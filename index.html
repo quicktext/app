@@ -1029,6 +1029,40 @@
             font-size: 0.7rem;
             color: var(--text-muted);
         }
+
+        /* Bouton Installer en icône SVG */
+        .btn-install-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            background: rgba(155, 89, 182, 0.15);
+            border: 1px solid rgba(155, 89, 182, 0.3);
+            border-radius: 50%;
+            color: var(--accent-light);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .btn-install-icon:hover {
+            background: rgba(155, 89, 182, 0.25);
+            border-color: var(--accent);
+            transform: scale(1.05);
+        }
+
+        .btn-install-icon:active {
+            transform: scale(0.95);
+            background: rgba(155, 89, 182, 0.35);
+        }
+
+        .header-right-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -1049,21 +1083,18 @@
             </div>
 
             <div class="header-right-group">
-                <!-- Badge crédits (simple affichage) -->
                 <div class="credits-badge" id="creditsBadge" title="Crédits disponibles">
                     <span class="credits-icon">💰</span>
                     <span id="creditsCount">0</span>
                 </div>
-                <!-- Bouton de recharge -->
-                <button id="rechargeBtn" class="btn-recharge">Recharge</button>
-                <!-- Bouton installer (PWA) -->
-                <button id="installBtn" class="install-btn" style="display: none;">
-                    <span class="install-icon">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 3v12M7 11l5 5 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                    </span> Installer
+                <button id="rechargeBtn" class="btn-recharge">⚡ Recharge</button>
+                
+                <!-- ✅ Bouton Installer en icône SVG uniquement -->
+                <button id="installBtn" class="btn-install-icon" style="display: none;" title="Installer l'application">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                        <path d="M12 3v12M7 11l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
                 </button>
             </div>
         </header>
