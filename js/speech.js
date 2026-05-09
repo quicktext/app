@@ -318,7 +318,7 @@ const SpeechModule = (function() {
 
     function handleVisibilityChange() {
         if (document.hidden && state.isRecording) {
-            console.log('📵 Arrière‑plan → arrêt reconnaissance');
+            console.log('Arrière‑plan → arrêt reconnaissance');
             stopRecognition();
             if (SpeechModule.onError) SpeechModule.onError('Enregistrement interrompu (onglet caché)');
         }
@@ -502,7 +502,7 @@ const SpeechModule = (function() {
 
     function pauseSpeaking() {
         if (!state.isSpeaking || state.isPaused) return;
-        speechSynthesis.cancel();       // ⚠️ annule et mémorise la position grâce à onboundary
+        speechSynthesis.cancel();       // Annule et mémorise la position grâce à onboundary
         state.isPaused = true;
         state.isSpeaking = false;
         if (SpeechModule.onPause) SpeechModule.onPause();

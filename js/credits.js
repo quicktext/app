@@ -65,7 +65,7 @@ const CreditModule = {
         await this.ensureUser();
         await this.loadPricing(); // Charger les prix une seule fois
         this.initialized = true;
-        console.log('💰 Crédits initialisés - ' + this.currentCredits + ' crédits');
+        console.log('Crédits initialisés - ' + this.currentCredits + ' crédits');
     },
 
     async ensureUser() {
@@ -127,10 +127,10 @@ const CreditModule = {
                 this.config.services = services;
                 this._pricingCache = services;
                 this._pricingLastFetch = now;
-                console.log('💰 Tarification mise à jour :', services);
+                console.log('Tarification mise à jour :', services);
             }
         } catch (e) {
-            console.warn('⚠️ Tarification inaccessible, utilisation du cache local');
+            console.warn('Tarification inaccessible, utilisation du cache local');
         }
     },
 
@@ -156,7 +156,7 @@ const CreditModule = {
                 window.storage.set('credits', this.currentCredits);
             }
         } catch (e) {
-            console.warn('⚠️ Sync crédits échouée, utilisation du cache');
+            console.warn('Sync crédits échouée, utilisation du cache');
         }
     },
 
@@ -228,7 +228,7 @@ const CreditModule = {
         this._creditsLastFetch = Date.now();
         window.storage.set('credits', newCredits);
 
-        console.log('💰 ' + cost + ' crédits utilisés - Restant: ' + newCredits);
+        console.log(cost + ' crédits utilisés - Restant: ' + newCredits);
         return true;
     },
 
@@ -281,7 +281,7 @@ const CreditModule = {
         // Sauvegarder en local pour ne plus afficher le pop-up
         window.storage.set('profile_completed', true);
         
-        console.log('✅ Profil mis à jour');
+        console.log('Profil mis à jour');
         return true;
     },
 

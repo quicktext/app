@@ -114,7 +114,7 @@ const AIModule = {
                     return result;
                 }
             } catch (e) {
-                console.warn(`⚠️ API ${provider.name} échouée :`, e.message);
+                console.warn(`API ${provider.name} échouée :`, e.message);
             }
         }
         

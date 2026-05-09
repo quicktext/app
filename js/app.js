@@ -127,7 +127,7 @@
             
             // Validation du téléphone si renseigné
             if (phone && !/^[67]\d{8}$/.test(phone)) {
-                showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
+                showToast('📱 Numéro invalide. Format : 69xxxxxxx (9 chiffres).');
                 document.getElementById('regPhone')?.focus();
                 return;
             }
@@ -215,7 +215,7 @@
             // Validation téléphone
             const phoneRegex = /^[67]\d{8}$/;
             if (!phoneRegex.test(phone)) {
-                showToast('📱 Numéro invalide. Exemple : 696271312 (9 chiffres, commence par 6 ou 7).');
+                showToast('Numéro invalide. Exemple : 69xxxxxxx (9 chiffres, commence par 6).');
                 phoneInput?.focus();
                 return;
             }
@@ -223,7 +223,7 @@
             // Validation montant
             const amount = parseInt(amountStr, 10);
             if (isNaN(amount) || amount < 1 || amount > 1000000) {
-                showToast('💵 Montant invalide (1 à 1 000 000 XAF).');
+                showToast('Montant invalide (1 à 1 000 000 XAF).');
                 amountInput?.focus();
                 return;
             }
@@ -296,13 +296,13 @@
 
                 // Messages d'erreur selon le type
                 if (e.name === 'AbortError') {
-                    showToast('⏰ Délai dépassé. Vérifiez votre connexion internet et réessayez.');
+                    showToast('Délai dépassé. Vérifiez votre connexion internet et réessayez.');
                 } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-                    showToast('📡 Pas de connexion internet. Vérifiez votre réseau.');
+                    showToast('Pas de connexion internet. Vérifiez votre réseau.');
                 } else if (e.message.includes('HTTP')) {
-                    showToast('🔧 ' + e.message);
+                    showToast(e.message);
                 } else {
-                    showToast('⚠️ Erreur : ' + e.message);
+                    showToast('Erreur : ' + e.message);
                 }
             } finally {
                 // Réactiver le bouton dans tous les cas
@@ -1269,22 +1269,22 @@
             return;
         }
         
-        updateModeIndicator('📄 Extraction PDF...');
+        updateModeIndicator('Extraction PDF...');
         
         try {
             const text = await PDFModule.extractText(file);
             if (text && text.trim()) {
                 if (DOM.output) DOM.output.value = text;
                 state.fullTranscript = text;
-                updateModeIndicator('✅ PDF extrait');
+                updateModeIndicator('PDF extrait');
                 showToast('PDF extrait (' + text.length.toLocaleString() + ' car.)');
             } else {
                 showToast('Aucun texte extractible');
-                updateModeIndicator('⚠️ Vide');
+                updateModeIndicator('Vide');
             }
         } catch (err) {
             showToast('Erreur PDF: ' + err.message);
-            updateModeIndicator('❌ Erreur');
+            updateModeIndicator('Erreur');
         }
         
         e.target.value = '';
