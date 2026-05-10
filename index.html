@@ -816,12 +816,17 @@
         .credits-badge {
             display: flex;
             align-items: center;
-            background: #f0f4f8;
-            padding: 5px 12px;
+            gap: 4px;
+            background: rgba(155, 89, 182, 0.15);
+            border: 1px solid rgba(155, 89, 182, 0.3);
             border-radius: 20px;
-            font-weight: bold;
-            color: #2d3748;
-            border: 1px solid #d1d9e6;
+            padding: 5px 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent-light);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
         }
 
         .credits-badge:hover {
@@ -839,18 +844,6 @@
             animation: pulse 2s infinite;
         }
 
-                .credits-icon {
-            display: flex;
-            margin-right: 8px;
-            color: #f59e0b; /* Couleur dorée/ambre pour symboliser la valeur */
-        }
-
-        .credits-icon svg {
-            /* Garde l'icône proportionnelle au texte */
-            width: 18px;
-            height: 18px;
-        }
-        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.6; }
@@ -1288,7 +1281,7 @@
         .admin-table tr:hover td {
             background: rgba(255,255,255,0.02);
         }
-
+        
     </style>
 </head>
 <body>
@@ -1312,10 +1305,10 @@
                 <div class="credits-badge" id="creditsBadge" title="Crédits disponibles">
                     <span class="credits-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="8"></circle>
-                            <line x1="12" y1="8" x2="12" y2="16"></line>
-                            <line x1="8" y1="12" x2="16" y2="12"></line>
-                        </svg>
+                        <circle cx="12" cy="12" r="8"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
                     </span>
                     <span id="creditsCount">0</span>
                 </div>
