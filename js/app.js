@@ -28,7 +28,7 @@
             // Option par défaut
             const autoOption = document.createElement('option');
             autoOption.value = 'auto';
-            autoOption.textContent = '🎙️ Auto (meilleure voix)';
+            autoOption.textContent = 'Auto (meilleure voix)';
             DOM.voiceSelect.appendChild(autoOption);
             
             // Essayer de charger les voix
@@ -1159,21 +1159,19 @@
     async function handleIA() {
         if (state.isProcessingIA) return;
 
+        const text = DOM.output ? DOM.output.value : '';
+        if (!text || !text.trim()) { 
+            showToast('Aucun texte à traiter'); 
+            return; 
+        }
+
+        // Vérifier les crédits AVANT de lancer le traitement
         try {
             await CreditModule.canUseService('ia_processing');
         } catch (e) {
             showToast(e.message);
             return;
         }
-        
-        const text = DOM.output ? DOM.output.value : '';
-        if (!text || !text.trim()) { 
-            showToast('Aucun texte à traiter'); 
-            return; 
-        }
-        
-        // SUPPRIMÉ : la vérification de clé API utilisateur
-        // Si pas de clé, DeepSeek prendra le relais automatiquement
         
         state.isProcessingIA = true;
         
@@ -1186,6 +1184,8 @@
         if (DOM.progressFill) DOM.progressFill.style.width = '0%';
         updateModeIndicator('IA en cours...');
         
+        let traitementReussi = false;
+        
         try {
             const result = await AIModule.processText(
                 text, state.selectedAction,
@@ -1196,20 +1196,27 @@
                 }
             );
             
+            // Vérifier que le résultat est valide
             if (result && result.trim() && state.isProcessingIA) {
                 if (DOM.output) DOM.output.value = result;
                 state.fullTranscript = result;
                 updateModeIndicator('Terminé');
                 if (DOM.formatInfo) DOM.formatInfo.textContent = result.length.toLocaleString() + ' caractères';
                 showToast('Traitement IA terminé');
+                traitementReussi = true; // ← Marquer comme réussi
+            } else {
+                throw new Error('Résultat vide du traitement IA');
             }
         } catch (e) {
             if (e.name === 'AbortError' || (e.message && e.message.includes('interrompu'))) {
-                console.log('IA interrompue');
+                console.log('IA interrompue par l\'utilisateur');
+                showToast('⏹ Traitement interrompu');
             } else {
-                showToast('Erreur IA: ' + (e.message || 'Erreur inconnue'));
+                console.error('Erreur IA :', e);
+                showToast('Erreur IA : ' + (e.message || 'Erreur inconnue'));
                 updateModeIndicator('Échec');
             }
+            traitementReussi = false; // ← Échec ou interruption
         } finally {
             state.isProcessingIA = false;
             if (DOM.iaBtn) {
@@ -1217,11 +1224,24 @@
                 DOM.iaBtn.querySelector('span:last-child').textContent = 'IA';
                 DOM.iaBtn.title = 'Lancer le traitement IA';
             }
-            setTimeout(() => { if (DOM.progressBar && !state.isProcessingIA) DOM.progressBar.style.display = 'none'; }, 2000);
+            setTimeout(() => { 
+                if (DOM.progressBar && !state.isProcessingIA) {
+                    DOM.progressBar.style.display = 'none';
+                }
+            }, 2000);
         }
 
-        await CreditModule.useCredits('ia_processing');
-        updateCreditsDisplay();
+        // Débiter les crédits UNIQUEMENT si le traitement a réussi
+        if (traitementReussi) {
+            try {
+                await CreditModule.useCredits('ia_processing');
+                updateCreditsDisplay();
+            } catch (e) {
+                console.warn('Erreur débit crédits IA :', e);
+            }
+        } else {
+            console.log('Aucun crédit débité (traitement non abouti)');
+        }
     }
     
     // ============================================================

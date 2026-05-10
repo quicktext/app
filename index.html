@@ -1095,8 +1095,67 @@
             margin: 0;
         }
 
+        /* Effet de pression sur tous les boutons du dashboard */
+        .admin-close-btn:active,
+        .filter-btn:active,
+        .filter-btn-secondary:active {
+            transform: scale(0.95);
+            transition: transform 0.1s ease;
+        }
+
+        /* Style cohérent pour le bouton Filtrer (comme popup-btn-confirm) */
+        .filter-btn {
+            padding: 10px 18px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+            letter-spacing: 0.2px;
+        }
+
+        .filter-btn:active {
+            transform: scale(0.96);
+            background: var(--accent-dark);
+        }
+
+        /* Style cohérent pour le bouton Réinitialiser (comme popup-btn-cancel) */
+        .filter-btn-secondary {
+            padding: 10px 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+
+        .filter-btn-secondary:active {
+            transform: scale(0.96);
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Effet hover pour les deux boutons */
+        .filter-btn:hover {
+            background: var(--accent-light);
+        }
+
+        .filter-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Effet de pression sur le bouton fermer */
         .admin-close-btn {
-            background: rgba(255,255,255,0.08);
+            background: rgba(255, 255, 255, 0.08);
             border: 1px solid var(--border);
             border-radius: 50%;
             width: 36px;
@@ -1106,11 +1165,17 @@
             justify-content: center;
             cursor: pointer;
             color: var(--text-secondary);
-            transition: all 0.2s;
+            transition: all 0.15s ease;
+        }
+
+        .admin-close-btn:active {
+            transform: scale(0.9);
+            background: rgba(231, 76, 60, 0.3);
+            color: #f08080;
         }
 
         .admin-close-btn:hover {
-            background: rgba(231, 76, 60, 0.2);
+            background: rgba(231, 76, 60, 0.15);
             color: #f08080;
         }
 
@@ -1183,24 +1248,7 @@
             font-family: inherit;
         }
 
-        .filter-btn {
-            padding: 8px 16px;
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-family: inherit;
-            font-weight: 500;
-            white-space: nowrap;
-        }
 
-        .filter-btn-secondary {
-            background: rgba(255,255,255,0.08);
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-        }
 
         .admin-table-container {
             overflow-x: auto;
@@ -1403,8 +1451,8 @@
             </div>
             
             <div class="admin-filters">
-                <input type="text" class="popup-input" id="filterName" placeholder="🔍 Filtrer par nom...">
-                <input type="tel" class="popup-input" id="filterPhone" placeholder="📱 Filtrer par téléphone...">
+                <input type="text" class="popup-input" id="filterName" placeholder="Filtrer par nom...">
+                <input type="tel" class="popup-input" id="filterPhone" placeholder="Filtrer par téléphone...">
                 <button id="filterBtn" class="filter-btn">Filtrer</button>
                 <button id="resetFilterBtn" class="filter-btn filter-btn-secondary">Réinitialiser</button>
             </div>
