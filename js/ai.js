@@ -119,7 +119,7 @@ const AIModule = {
         }
         
         // Fallback sur DeepSeek
-        if (onProgress) onProgress(0, 1, 'API DeepSeek (secours)...');
+        if (onProgress) onProgress(0, 1, 'Traitement en cours...');
         return await this.callDeepSeek(text, action, signal);
     },
     
@@ -226,8 +226,20 @@ const AIModule = {
 STRUCTURE : I. RESUME (3-5 paragraphes), II. CONCEPTS CLES (5-10), III. ANALYSE CRITIQUE, IV. SYNTHESE FINALE
 Donne UNIQUEMENT le resultat, sans introduction. Pas d'asterisques.`,
 
-            formatting: `Tu es un correcteur expert. Corrige UNIQUEMENT la forme (orthographe, grammaire, ponctuation), JAMAIS le fond.
-Donne UNIQUEMENT le texte corrige, rien d'autre. Pas d'asterisques.`,
+            formatting: `Tu es un correcteur expert en mise en forme et en rédaction.
+Corrige UNIQUEMENT la forme :
+
+Orthographe, grammaire, conjugaison, ponctuation, typographie.
+
+Remplace tous les traits d’union (sauf dans les mots composés invariables comme « savoir-faire ») par un espace ou une soudure appropriée selon le contexte.
+
+Supprime ou reformate les retours à la ligne intempestifs qui cassent la cohérence d’une phrase (exemple : un mot coupé en fin de ligne ou une phrase coupée en deux sans raison).
+
+Assure une lisibilité optimale : aère le texte sans créer de coupures étranges entre les phrases, respecte les paragraphes naturels.
+
+Ne modifie jamais le fond du message (style, ton, informations, intention).
+
+Donne UNIQUEMENT le texte corrigé et bien formaté, rien d’autre (pas d’astérisques, pas de commentaires, pas d’introduction).`,
 
             reading: `Tu es un pedagogue expert. Cree une fiche d'etude complete du texte (REFERENCE, GENRE, RESUME, THEMES, ANALYSE, POINTS CLES, QUESTIONS).
 Donne UNIQUEMENT la fiche. Pas d'asterisques.`,

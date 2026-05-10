@@ -1151,7 +1151,7 @@
             }
             if (DOM.progressBar) DOM.progressBar.style.display = 'none';
             if (DOM.progressFill) DOM.progressFill.style.width = '0%';
-            updateModeIndicator('⏹ Interrompu');
+            updateModeIndicator('Interrompu');
             showToast('Traitement IA interrompu');
         }
     }
