@@ -1165,15 +1165,31 @@
             return; 
         }
 
-        // Vérifier les crédits AVANT de lancer le traitement
-        try {
-            await CreditModule.canUseService('ia_processing');
-        } catch (e) {
-            showToast(e.message);
+        const charCount = text.length;
+        const iaCost = calculateIACost(charCount);
+        
+        // Demander confirmation pour les gros traitements
+        if (charCount > 20000) {
+            const confirmed = await confirmLargeProcessing(charCount, iaCost);
+            if (!confirmed) return;
+        }
+
+        // Vérifier les crédits
+        if (CreditModule.currentCredits < iaCost) {
+            showToast(
+                '💰 Crédits insuffisants !\n\n' +
+                'Texte : ' + charCount.toLocaleString() + ' caractères\n' +
+                'Coût : ' + iaCost + ' crédits\n' +
+                'Vos crédits : ' + CreditModule.currentCredits
+            );
             return;
         }
         
         state.isProcessingIA = true;
+        
+        // ✅ Variables pour suivre la progression
+        let caracteresTraites = 0;
+        let dernierPourcentage = 0;
         
         if (DOM.iaBtn) {
             DOM.iaBtn.querySelector('span:last-child').textContent = '...';
@@ -1182,9 +1198,11 @@
         
         if (DOM.progressBar) DOM.progressBar.style.display = 'block';
         if (DOM.progressFill) DOM.progressFill.style.width = '0%';
-        updateModeIndicator('IA en cours...');
+        updateModeIndicator('🤖 IA en cours...');
         
         let traitementReussi = false;
+        let traitementInterrompu = false;
+        let apiIndisponible = false;
         
         try {
             const result = await AIModule.processText(
@@ -1192,31 +1210,45 @@
                 (current, total, label) => {
                     const percent = Math.round((current / total) * 100);
                     if (DOM.progressFill) DOM.progressFill.style.width = percent + '%';
-                    updateModeIndicator(label);
+                    updateModeIndicator('🤖 ' + label);
+                    
+                    // ✅ Suivre la progression en caractères
+                    if (total > 0) {
+                        caracteresTraites = Math.round((current / total) * charCount);
+                        dernierPourcentage = percent;
+                    }
                 }
             );
             
-            // Vérifier que le résultat est valide
             if (result && result.trim() && state.isProcessingIA) {
                 if (DOM.output) DOM.output.value = result;
                 state.fullTranscript = result;
-                updateModeIndicator('Terminé');
+                updateModeIndicator('✅ Terminé');
                 if (DOM.formatInfo) DOM.formatInfo.textContent = result.length.toLocaleString() + ' caractères';
-                showToast('Traitement IA terminé');
-                traitementReussi = true; // ← Marquer comme réussi
+                traitementReussi = true;
+                caracteresTraites = charCount; // 100% traité
             } else {
                 throw new Error('Résultat vide du traitement IA');
             }
         } catch (e) {
             if (e.name === 'AbortError' || (e.message && e.message.includes('interrompu'))) {
-                console.log('IA interrompue par l\'utilisateur');
-                showToast('⏹ Traitement interrompu');
+                console.log('⏹ IA interrompue par l\'utilisateur');
+                traitementInterrompu = true;
+            } else if (e.message && (e.message.includes('Failed to fetch') || 
+                                    e.message.includes('NetworkError') ||
+                                    e.message.includes('timeout') ||
+                                    e.message.includes('429') ||
+                                    e.message.includes('503') ||
+                                    e.message.includes('502'))) {
+                console.error('🌐 API indisponible :', e.message);
+                apiIndisponible = true;
+                showToast('🌐 API indisponible. Aucun crédit débité.');
+                updateModeIndicator('❌ API indisponible');
             } else {
                 console.error('Erreur IA :', e);
-                showToast('Erreur IA : ' + (e.message || 'Erreur inconnue'));
-                updateModeIndicator('Échec');
+                showToast('❌ Erreur IA : ' + (e.message || 'Erreur inconnue'));
+                updateModeIndicator('❌ Échec');
             }
-            traitementReussi = false; // ← Échec ou interruption
         } finally {
             state.isProcessingIA = false;
             if (DOM.iaBtn) {
@@ -1231,17 +1263,178 @@
             }, 2000);
         }
 
-        // Débiter les crédits UNIQUEMENT si le traitement a réussi
+        // ============================================================
+        // ✅ LOGIQUE DE DÉBIT
+        // ============================================================
+        
         if (traitementReussi) {
+            // Traitement complet → débiter le coût total
             try {
-                await CreditModule.useCredits('ia_processing');
+                await CreditModule.useCredits('ia_processing', iaCost);
                 updateCreditsDisplay();
+                showToast('✅ Traitement IA terminé (' + iaCost + ' crédits)');
             } catch (e) {
-                console.warn('Erreur débit crédits IA :', e);
+                console.warn('Erreur débit crédits :', e);
             }
+        } else if (traitementInterrompu && caracteresTraites > 0) {
+            // Interrompu par l'utilisateur → débiter proportionnellement
+            const creditDebites = calculatePartialCost(charCount, caracteresTraites, iaCost);
+            
+            if (creditDebites > 0) {
+                try {
+                    await CreditModule.useCredits('ia_processing', creditDebites);
+                    updateCreditsDisplay();
+                    
+                    const pourcentageTraite = Math.round((caracteresTraites / charCount) * 100);
+                    showToast(
+                        '⏹ Traitement interrompu à ' + pourcentageTraite + '%\n' +
+                        creditDebites + ' crédits débités (sur ' + iaCost + ' prévus)'
+                    );
+                } catch (e) {
+                    console.warn('Erreur débit crédits partiels :', e);
+                }
+            } else {
+                showToast('⏹ Traitement interrompu (trop tôt, aucun crédit débité)');
+            }
+        } else if (apiIndisponible) {
+            // API indisponible → aucun débit
+            console.log('💰 Aucun crédit débité (API indisponible)');
+            showToast('🌐 API DeepSeek indisponible. Réessayez plus tard.');
         } else {
-            console.log('Aucun crédit débité (traitement non abouti)');
+            // Autre échec → aucun débit
+            console.log('💰 Aucun crédit débité (traitement échoué)');
         }
+    }
+
+    // ============================================================
+    // ✅ NOUVELLE FONCTION : Calcul du coût partiel
+    // ============================================================
+    function calculatePartialCost(totalChars, traitedChars, totalCost) {
+        // Ne rien facturer si moins de 5% traité
+        const pourcentage = traitedChars / totalChars;
+        if (pourcentage < 0.05) return 0;
+        
+        // Facturer proportionnellement, arrondi à l'entier supérieur
+        const coutProportionnel = Math.ceil(totalCost * pourcentage);
+        
+        // Minimum 1 crédit si au moins 5% traité
+        return Math.max(1, coutProportionnel);
+    }
+
+    // ============================================================
+    // ✅ Fonction de calcul du coût selon la taille
+    // ============================================================
+    function calculateIACost(charCount) {
+        if (charCount <= 2000) return 5;
+        if (charCount <= 5000) return 10;
+        if (charCount <= 10000) return 20;
+        if (charCount <= 20000) return 35;
+        if (charCount <= 40000) return 65;
+        if (charCount <= 80000) return 120;
+        return Math.ceil(charCount / 1000) * 1.5;
+    }
+
+    // ============================================================
+    // ✅ Confirmation pour les gros traitements
+    // ============================================================
+    function confirmLargeProcessing(charCount, cost) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+            overlay.setAttribute('role', 'dialog');
+            
+            overlay.innerHTML = `
+                <div class="popup-dialog">
+                    <div class="popup-icon">🤖</div>
+                    <div class="popup-title">Traitement volumineux</div>
+                    <div class="popup-message">
+                        Votre texte contient <strong>${charCount.toLocaleString()}</strong> caractères.<br>
+                        Coût estimé : <strong>${cost} crédits</strong> (${(cost * 0.25).toFixed(0)} FCFA).<br>
+                        <small>En cas d'interruption, seuls les caractères traités seront facturés.</small><br><br>
+                        Continuer ?
+                    </div>
+                    <div class="popup-buttons">
+                        <button class="popup-btn popup-btn-cancel" id="cancelLargeIA">Annuler</button>
+                        <button class="popup-btn popup-btn-confirm" id="confirmLargeIA">Continuer</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            overlay.querySelector('#cancelLargeIA').onclick = () => {
+                overlay.remove();
+                resolve(false);
+            };
+            
+            overlay.querySelector('#confirmLargeIA').onclick = () => {
+                overlay.remove();
+                resolve(true);
+            };
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    // Nouvelle fonction : calculer le coût IA selon les caractères
+    function calculateIACost(charCount) {
+        if (charCount <= 2000) return 5;
+        if (charCount <= 5000) return 10;
+        if (charCount <= 10000) return 20;
+        if (charCount <= 20000) return 35;
+        if (charCount <= 40000) return 65;
+        if (charCount <= 80000) return 120;
+        // Au-delà de 80 000 : 1.5 crédit par tranche de 1000 caractères
+        return Math.ceil(charCount / 1000) * 1.5;
+    }
+
+    // Nouvelle fonction : confirmation pour les gros traitements
+    function confirmLargeProcessing(charCount, cost) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+            overlay.setAttribute('role', 'dialog');
+            
+            overlay.innerHTML = `
+                <div class="popup-dialog">
+                    <div class="popup-icon">🤖</div>
+                    <div class="popup-title">Traitement volumineux</div>
+                    <div class="popup-message">
+                        Votre texte contient <strong>${charCount.toLocaleString()}</strong> caractères.<br>
+                        Coût estimé : <strong>${cost} crédits</strong> (${(cost * 0.25).toFixed(0)} FCFA).<br><br>
+                        Continuer ?
+                    </div>
+                    <div class="popup-buttons">
+                        <button class="popup-btn popup-btn-cancel" id="cancelLargeIA">Annuler</button>
+                        <button class="popup-btn popup-btn-confirm" id="confirmLargeIA">Continuer</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            overlay.querySelector('#cancelLargeIA').onclick = () => {
+                overlay.remove();
+                resolve(false);
+            };
+            
+            overlay.querySelector('#confirmLargeIA').onclick = () => {
+                overlay.remove();
+                resolve(true);
+            };
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                    resolve(false);
+                }
+            });
+        });
     }
     
     // ============================================================
