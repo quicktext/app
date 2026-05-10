@@ -1177,7 +1177,7 @@
         // Vérifier les crédits
         if (CreditModule.currentCredits < iaCost) {
             showToast(
-                '💰 Crédits insuffisants !\n\n' +
+                'Crédits insuffisants !\n\n' +
                 'Texte : ' + charCount.toLocaleString() + ' caractères\n' +
                 'Coût : ' + iaCost + ' crédits\n' +
                 'Vos crédits : ' + CreditModule.currentCredits
@@ -1187,7 +1187,7 @@
         
         state.isProcessingIA = true;
         
-        // ✅ Variables pour suivre la progression
+        // Variables pour suivre la progression
         let caracteresTraites = 0;
         let dernierPourcentage = 0;
         
@@ -1198,7 +1198,7 @@
         
         if (DOM.progressBar) DOM.progressBar.style.display = 'block';
         if (DOM.progressFill) DOM.progressFill.style.width = '0%';
-        updateModeIndicator('🤖 IA en cours...');
+        updateModeIndicator('IA en cours...');
         
         let traitementReussi = false;
         let traitementInterrompu = false;
@@ -1210,9 +1210,9 @@
                 (current, total, label) => {
                     const percent = Math.round((current / total) * 100);
                     if (DOM.progressFill) DOM.progressFill.style.width = percent + '%';
-                    updateModeIndicator('🤖 ' + label);
+                    updateModeIndicator(label);
                     
-                    // ✅ Suivre la progression en caractères
+                    // Suivre la progression en caractères
                     if (total > 0) {
                         caracteresTraites = Math.round((current / total) * charCount);
                         dernierPourcentage = percent;
@@ -1223,7 +1223,7 @@
             if (result && result.trim() && state.isProcessingIA) {
                 if (DOM.output) DOM.output.value = result;
                 state.fullTranscript = result;
-                updateModeIndicator('✅ Terminé');
+                updateModeIndicator('Terminé');
                 if (DOM.formatInfo) DOM.formatInfo.textContent = result.length.toLocaleString() + ' caractères';
                 traitementReussi = true;
                 caracteresTraites = charCount; // 100% traité
@@ -1240,14 +1240,14 @@
                                     e.message.includes('429') ||
                                     e.message.includes('503') ||
                                     e.message.includes('502'))) {
-                console.error('🌐 API indisponible :', e.message);
+                console.error('API indisponible :', e.message);
                 apiIndisponible = true;
-                showToast('🌐 API indisponible. Aucun crédit débité.');
-                updateModeIndicator('❌ API indisponible');
+                showToast('API indisponible. Aucun crédit débité.');
+                updateModeIndicator('API indisponible');
             } else {
                 console.error('Erreur IA :', e);
-                showToast('❌ Erreur IA : ' + (e.message || 'Erreur inconnue'));
-                updateModeIndicator('❌ Échec');
+                showToast('Erreur IA : ' + (e.message || 'Erreur inconnue'));
+                updateModeIndicator('Échec');
             }
         } finally {
             state.isProcessingIA = false;
@@ -1264,7 +1264,7 @@
         }
 
         // ============================================================
-        // ✅ LOGIQUE DE DÉBIT
+        // LOGIQUE DE DÉBIT
         // ============================================================
         
         if (traitementReussi) {
@@ -1272,7 +1272,7 @@
             try {
                 await CreditModule.useCredits('ia_processing', iaCost);
                 updateCreditsDisplay();
-                showToast('✅ Traitement IA terminé (' + iaCost + ' crédits)');
+                showToast('Traitement IA terminé (' + iaCost + ' crédits)');
             } catch (e) {
                 console.warn('Erreur débit crédits :', e);
             }
@@ -1287,27 +1287,27 @@
                     
                     const pourcentageTraite = Math.round((caracteresTraites / charCount) * 100);
                     showToast(
-                        '⏹ Traitement interrompu à ' + pourcentageTraite + '%\n' +
+                        'Traitement interrompu à ' + pourcentageTraite + '%\n' +
                         creditDebites + ' crédits débités (sur ' + iaCost + ' prévus)'
                     );
                 } catch (e) {
                     console.warn('Erreur débit crédits partiels :', e);
                 }
             } else {
-                showToast('⏹ Traitement interrompu (trop tôt, aucun crédit débité)');
+                showToast('Traitement interrompu (trop tôt, aucun crédit débité)');
             }
         } else if (apiIndisponible) {
             // API indisponible → aucun débit
-            console.log('💰 Aucun crédit débité (API indisponible)');
-            showToast('🌐 API DeepSeek indisponible. Réessayez plus tard.');
+            console.log('Aucun crédit débité (API indisponible)');
+            showToast('API DeepSeek indisponible. Réessayez plus tard.');
         } else {
             // Autre échec → aucun débit
-            console.log('💰 Aucun crédit débité (traitement échoué)');
+            console.log('Aucun crédit débité (traitement échoué)');
         }
     }
 
     // ============================================================
-    // ✅ NOUVELLE FONCTION : Calcul du coût partiel
+    // NOUVELLE FONCTION : Calcul du coût partiel
     // ============================================================
     function calculatePartialCost(totalChars, traitedChars, totalCost) {
         // Ne rien facturer si moins de 5% traité
@@ -1322,7 +1322,7 @@
     }
 
     // ============================================================
-    // ✅ Fonction de calcul du coût selon la taille
+    // Fonction de calcul du coût selon la taille
     // ============================================================
     function calculateIACost(charCount) {
         if (charCount <= 2000) return 5;
@@ -1335,7 +1335,7 @@
     }
 
     // ============================================================
-    // ✅ Confirmation pour les gros traitements
+    // Confirmation pour les gros traitements
     // ============================================================
     function confirmLargeProcessing(charCount, cost) {
         return new Promise((resolve) => {
@@ -1345,7 +1345,16 @@
             
             overlay.innerHTML = `
                 <div class="popup-dialog">
-                    <div class="popup-icon">🤖</div>
+                    <div class="popup-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 8V4H8"></path>
+                            <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+                            <path d="M2 14h2"></path>
+                            <path d="M20 14h2"></path>
+                            <path d="M15 13v2"></path>
+                            <path d="M9 13v2"></path>
+                        </svg>
+                    </div>
                     <div class="popup-title">Traitement volumineux</div>
                     <div class="popup-message">
                         Votre texte contient <strong>${charCount.toLocaleString()}</strong> caractères.<br>
