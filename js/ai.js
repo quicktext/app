@@ -221,32 +221,61 @@ const AIModule = {
     // ============================================================
     getPrompt(action) {
         const prompts = {
+            formatting: `Tu es un correcteur expert en mise en forme et en rédaction française.
+
+    RÈGLES IMPÉRATIVES À APPLIQUER :
+
+    1. CORRECTION LINGUISTIQUE
+    - Corrige les fautes d'orthographe, de grammaire et de conjugaison
+    - Ajoute ou corrige la ponctuation manquante ou erronée
+    - Respecte la typographie française (espaces, guillemets, etc.)
+
+    2. SUPPRESSION DES CÉSURES (TRÈS IMPORTANT)
+    - Les césures sont des traits d'union en fin de ligne qui coupent un mot
+    - Exemple : "Sei-gneur" → "Seigneur"
+    - Exemple : "bien-faits" → "bienfaits" (si césure)
+    - Exemple : "puis-sance" → "puissance"
+    - DÉTECTE tous les mots coupés par un trait d'union en fin de ligne et SOUDE-les
+    - Un mot composé invariable comme "savoir-faire" ou "c'est-à-dire" garde ses traits d'union
+    - Si un mot est coupé entre deux lignes, RECONSTRUIS-le
+
+    3. REFORMATAGE DES PARAGRAPHES
+    - Supprime tous les retours à la ligne qui coupent une phrase en milieu de phrase
+    - Reconstitue les phrases complètes
+    - Conserve uniquement les vrais sauts de paragraphe
+    - Aère le texte avec des paragraphes cohérents
+
+    4. CONSIGNES STRICTES
+    - Ne modifie JAMAIS le fond
+    - Ne reformule PAS
+    - Donne UNIQUEMENT le texte corrigé
+    - AUCUNE introduction, AUCUN commentaire, AUCUN astérisque
+
+    Texte à corriger :`,
+
             summarize: `Tu es un analyste expert. Realise une synthese analytique complete du texte suivant.
 
-STRUCTURE : I. RESUME (3-5 paragraphes), II. CONCEPTS CLES (5-10), III. ANALYSE CRITIQUE, IV. SYNTHESE FINALE
-Donne UNIQUEMENT le resultat, sans introduction. Pas d'asterisques.`,
+    STRUCTURE :
+    I. RESUME STRUCTURE (3-5 paragraphes)
+    II. CONCEPTS CLES (5-10 avec definition)
+    III. ANALYSE CRITIQUE (forces, faiblesses, implications)
+    IV. SYNTHESE FINALE
 
-            formatting: `Tu es un correcteur expert en mise en forme et en rédaction.
-Corrige UNIQUEMENT la forme :
+    Donne UNIQUEMENT le resultat, sans introduction. Pas d'asterisques.`,
 
-Orthographe, grammaire, conjugaison, ponctuation, typographie.
+            reading: `Tu es un pedagogue expert. Cree une fiche d'etude complete du texte.
 
-Remplace tous les traits d’union (sauf dans les mots composés invariables comme « savoir-faire ») par un espace ou une soudure appropriée selon le contexte.
+    SECTIONS : REFERENCE, GENRE, RESUME (10-15 lignes), THEMES PRINCIPAUX (3-6), ANALYSE, POINTS CLES (5-10), QUESTIONS DE REVISION (5 avec reponses).
 
-Supprime ou reformate les retours à la ligne intempestifs qui cassent la cohérence d’une phrase (exemple : un mot coupé en fin de ligne ou une phrase coupée en deux sans raison).
+    Donne UNIQUEMENT la fiche. Pas d'asterisques.`,
 
-Assure une lisibilité optimale : aère le texte sans créer de coupures étranges entre les phrases, respecte les paragraphes naturels.
+            memory: `Tu es un expert en memorisation. Cree une fiche memorielle ultra-condensee.
 
-Ne modifie jamais le fond du message (style, ton, informations, intention).
+    SECTIONS : TITRE EVOCATEUR, 5 POINTS ESSENTIELS (avec astuce mnemotechnique), CARTE MENTALE, DEFINITIONS CLES, SYNTHESE FINALE.
 
-Donne UNIQUEMENT le texte corrigé et bien formaté, rien d’autre (pas d’astérisques, pas de commentaires, pas d’introduction).`,
-
-            reading: `Tu es un pedagogue expert. Cree une fiche d'etude complete du texte (REFERENCE, GENRE, RESUME, THEMES, ANALYSE, POINTS CLES, QUESTIONS).
-Donne UNIQUEMENT la fiche. Pas d'asterisques.`,
-
-            memory: `Tu es un expert en memorisation. Cree une fiche memorielle (TITRE, 5 POINTS ESSENTIELS, CARTE MENTALE, DEFINITIONS, SYNTHESE).
-Donne UNIQUEMENT la fiche. Pas d'asterisques.`
+    Donne UNIQUEMENT la fiche. Pas d'asterisques.`
         };
+        
         return prompts[action] || prompts.formatting;
     },
     
