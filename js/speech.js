@@ -40,7 +40,8 @@ const SpeechModule = (function() {
         visibilityHandler: null,
 
         // Buffer anti‑fragments mobile
-        finalSegments: []   // liste des segments formatés (avec ponctuation)
+        finalSegments: [],   // liste des segments formatés (avec ponctuation)
+        _speechDebited: false
     };
 
     // Dans SpeechModule, ajoutez cette fonction :
@@ -535,7 +536,8 @@ const SpeechModule = (function() {
     function speak(text, lang, rate, preferredVoiceName) {
         stopSpeaking();
         if (!text || !text.trim()) return;
-        
+        state._speechDebited = false;
+
         const clean = text.replace(/\s+/g, ' ').replace(/\n+/g, ' ').trim();
         const segments = clean.split(/(?<=[.!?;:])\s+/).filter(s => s.trim().length > 0);
         if (!segments.length) segments.push(clean);
@@ -592,6 +594,16 @@ const SpeechModule = (function() {
             if (state.isPaused) return;
             state.currentSegmentIndex++;
             state.currentSegmentCharOffset = 0;
+            
+            // Si c'était le dernier segment, déclencher onFinish
+            if (state.currentSegmentIndex >= state.textSegments.length) {
+                state.isSpeaking = false;
+                if (!state._speechDebited) {  // ← AJOUTER
+                    state._speechDebited = true;
+                    if (SpeechModule.onFinish) SpeechModule.onFinish();
+                }
+                return;
+            }
             speakNextSegment();
         };
         utterance.onerror = (e) => {
@@ -623,12 +635,16 @@ const SpeechModule = (function() {
 
     function stopSpeaking() {
         speechSynthesis.cancel();
+        // Si la lecture était en cours et pas encore débitée, on débite
+        if (state.isSpeaking && !state._speechDebited) {  // ← AJOUTER
+            state._speechDebited = true;
+            if (SpeechModule.onStop) SpeechModule.onStop();
+        }
         state.isSpeaking = false;
         state.isPaused = false;
         state.textSegments = [];
         state.currentSegmentIndex = 0;
         state.currentSegmentCharOffset = 0;
-        if (SpeechModule.onStop) SpeechModule.onStop();
     }
 
     // ============================================================

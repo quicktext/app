@@ -3,8 +3,8 @@ const CreditModule = {
     config: {
         apiUrl: 'https://zhvdyjpevrqteirqeztb.supabase.co',
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpodmR5anBldnJxdGVpcnFlenRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMDY1MTAsImV4cCI6MjA5MzY4MjUxMH0.0YpMPKb7Lf3FZyM0wNpa35MZutruk6ZdIAFMKASSpvA',
-        freeCredits: 100,
-        cacheDuration: 300000, // 5 minutes en millisecondes
+        freeCredits: 10,
+        cacheDuration: 300000,
         services: {}
     },
 
@@ -53,6 +53,88 @@ const CreditModule = {
     },
 
     // ============================================================
+    // CALCUL DU COÛT PAR SERVICE
+    // ============================================================
+    getServiceCost(service, charCount, pageCount) {
+        // PDF : facturation au nombre de pages
+        if (service === 'pdf_export' && pageCount !== undefined && pageCount !== null) {
+            return this.calculatePDFCost(pageCount);
+        }
+        // Autres services : facturation au nombre de caractères
+        if (charCount !== undefined && charCount !== null) {
+            return this.calculateCostByChars(service, charCount);
+        }
+        // Valeur par défaut (fallback)
+        return this.config.services[service]?.cost || this.getDefaultCost(service);
+    },
+
+    calculatePDFCost(pageCount) {
+        const pages = parseInt(pageCount) || 1;
+        if (pages <= 1) return 2;
+        if (pages <= 3) return 4;
+        if (pages <= 5) return 6;
+        if (pages <= 10) return 10;
+        if (pages <= 20) return 18;
+        if (pages <= 50) return 35;
+        if (pages <= 100) return 60;
+        return Math.ceil(60 + (pages - 100) * 0.5);
+    },
+
+    calculateCostByChars(service, charCount) {
+        const chars = parseInt(charCount) || 0;
+        switch (service) {
+            case 'dictation':
+                if (chars <= 500) return 1;
+                if (chars <= 1500) return 2;
+                if (chars <= 3000) return 3;
+                if (chars <= 6000) return 5;
+                return 8;
+            case 'translation':
+                if (chars <= 500) return 2;
+                if (chars <= 1500) return 5;
+                if (chars <= 3000) return 8;
+                if (chars <= 6000) return 15;
+                if (chars <= 10000) return 25;
+                return 35;
+            case 'speech_reading':
+                if (chars <= 1000) return 1;
+                if (chars <= 3000) return 2;
+                if (chars <= 6000) return 4;
+                if (chars <= 10000) return 6;
+                return 10;
+            case 'ia_processing':
+                return this.calculateIACost(chars);
+            default:
+                return 1;
+        }
+    },
+
+    calculateIACost(charCount) {
+        if (charCount <= 2000) return 5;
+        if (charCount <= 5000) return 10;
+        if (charCount <= 10000) return 20;
+        if (charCount <= 20000) return 35;
+        if (charCount <= 40000) return 65;
+        if (charCount <= 80000) return 120;
+        return Math.ceil(charCount / 1000) * 1.5;
+    },
+
+    getDefaultCost(service) {
+        const defaults = {
+            dictation: 1,
+            translation: 3,
+            ia_processing: 5,
+            pdf_export: 2,
+            speech_reading: 1,
+        };
+        return defaults[service] || 1;
+    },
+
+    getServiceName(service) {
+        return this.config.services[service]?.name || service;
+    },
+
+    // ============================================================
     // INITIALISATION
     // ============================================================
     async init() {
@@ -63,9 +145,9 @@ const CreditModule = {
         }
 
         await this.ensureUser();
-        await this.loadPricing(); // Charger les prix une seule fois
+        await this.loadPricing();
         this.initialized = true;
-        console.log('Crédits initialisés - ' + this.currentCredits + ' crédits');
+        console.log('💰 Crédits initialisés - ' + this.currentCredits + ' crédits');
     },
 
     async ensureUser() {
@@ -100,21 +182,17 @@ const CreditModule = {
             body: JSON.stringify({ user_id: this.userID, credits: this.config.freeCredits })
         });
     },
-  
+
     // ============================================================
     // TARIFICATION (avec cache)
     // ============================================================
     async loadPricing() {
         const now = Date.now();
-
-        // Si le cache est encore valide, ne rien faire
         if (this._pricingCache && (now - this._pricingLastFetch) < this.config.cacheDuration) {
             return;
         }
-
         try {
             const pricing = await this.supabaseQuery('/rest/v1/pricing?select=*');
-
             if (pricing && pricing.length > 0) {
                 const services = {};
                 pricing.forEach(item => {
@@ -127,26 +205,23 @@ const CreditModule = {
                 this.config.services = services;
                 this._pricingCache = services;
                 this._pricingLastFetch = now;
-                console.log('Tarification mise à jour :', services);
+                console.log('💰 Tarification mise à jour :', services);
             }
         } catch (e) {
-            console.warn('Tarification inaccessible, utilisation du cache local');
+            console.warn('⚠️ Tarification inaccessible');
         }
     },
 
     // ============================================================
-    // SYNCHRONISATION CRÉDITS (avec cache)
+    // SYNCHRONISATION CRÉDITS
     // ============================================================
     async syncCredits() {
         const now = Date.now();
-
-        // Si le cache est valide, utiliser le cache
         if (this._creditsCache !== null && (now - this._creditsLastFetch) < 30000) {
             this.currentCredits = this._creditsCache;
             window.storage.set('credits', this.currentCredits);
             return;
         }
-
         try {
             const user = await this.fetchUser();
             if (user) {
@@ -156,30 +231,26 @@ const CreditModule = {
                 window.storage.set('credits', this.currentCredits);
             }
         } catch (e) {
-            console.warn('Sync crédits échouée, utilisation du cache');
+            console.warn('⚠️ Sync crédits échouée');
         }
     },
 
     // ============================================================
-    // VÉRIFICATION RAPIDE (pas d'appel réseau)
+    // VÉRIFICATION RAPIDE
     // ============================================================
     async checkCredits(service) {
-        // Juste une vérification locale, pas d'appel réseau
         const cost = this.getServiceCost(service);
         return this.currentCredits >= cost;
     },
 
     async canUseService(service) {
-        // Sync rapide si le cache est expiré
         await this.syncCredits();
-
         const cost = this.getServiceCost(service);
         const hasCredits = this.currentCredits >= cost;
-
         if (!hasCredits) {
             const serviceName = this.getServiceName(service);
             throw new Error(
-                'Crédits insuffisants !\n\n' +
+                '💰 Crédits insuffisants !\n\n' +
                 'Service : ' + serviceName + '\n' +
                 'Coût : ' + cost + ' crédit(s)\n' +
                 'Vos crédits : ' + this.currentCredits + '\n\n' +
@@ -222,53 +293,32 @@ const CreditModule = {
             })
         });
 
-        // Mise à jour immédiate du cache local
         this.currentCredits = newCredits;
         this._creditsCache = newCredits;
         this._creditsLastFetch = Date.now();
         window.storage.set('credits', newCredits);
 
-        console.log(cost + ' crédits utilisés - Restant: ' + newCredits);
+        console.log('💰 ' + cost + ' crédits utilisés - Restant: ' + newCredits);
         return true;
     },
 
     // ============================================================
-    // GETTERS (locaux, instantanés)
-    // ============================================================
-    getServiceCost(service) {
-        return this.config.services[service]?.cost || 1;
-    },
-
-    getServiceName(service) {
-        return this.config.services[service]?.name || service;
-    },
-
-    // ============================================================
-    // RECHARGE (mise à jour forcée après)
+    // RECHARGE
     // ============================================================
     async afterRecharge() {
-        // Invalider le cache crédits
         this._creditsLastFetch = 0;
-        // Recharger immédiatement
         await this.syncCredits();
-        // Recharger les prix aussi
         await this.loadPricing();
     },
 
-    // ===========================================================
-    // MET A JOUR LE PROFIL UTILISATEUR
-    // ===========================================================
-
+    // ============================================================
+    // PROFIL UTILISATEUR
+    // ============================================================
     async updateProfile(userName, userTel, userRole) {
         const filter = 'user_id=eq.' + encodeURIComponent(this.userID);
         const users = await this.supabaseQuery('/rest/v1/users?select=id&' + filter);
-        
-        if (!users || users.length === 0) {
-            throw new Error('Utilisateur introuvable');
-        }
-        
+        if (!users || users.length === 0) throw new Error('Utilisateur introuvable');
         const internalId = users[0].id;
-        
         await this.supabaseQuery('/rest/v1/users?id=eq.' + internalId, {
             method: 'PATCH',
             body: JSON.stringify({
@@ -277,17 +327,10 @@ const CreditModule = {
                 user_role: userRole,
             })
         });
-        
-        // Sauvegarder en local pour ne plus afficher le pop-up
         window.storage.set('profile_completed', true);
-        
-        console.log('Profil mis à jour');
+        console.log('✅ Profil mis à jour');
         return true;
     },
-
-    // ============================================================
-    // VERIFIE SI LE PROFIL EST DEJA COMPLET
-    // ============================================================
 
     isProfileCompleted() {
         return window.storage.get('profile_completed', false);
