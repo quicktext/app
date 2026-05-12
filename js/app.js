@@ -104,7 +104,6 @@
         } else {
             DOM.creditsBadge?.classList.remove('low');
         }
-        // Plus de toast au clic
         if (DOM.creditsBadge) {
             DOM.creditsBadge.onclick = null;
         }
@@ -161,7 +160,9 @@
             overlay.setAttribute('role', 'dialog');
             overlay.innerHTML = `
                 <div class="popup-dialog">
-                    <div class="popup-icon">🤖</div>
+                    <div class="popup-icon">
+                        <svg viewBox="0 0 24 24" fill="none" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="5" stroke="#b07cc6" stroke-width="1.8"/><circle cx="9" cy="10" r="1.5" fill="#b07cc6"/><circle cx="15" cy="10" r="1.5" fill="#b07cc6"/><path d="M8 16c1.5 2 4.5 2 6 0" stroke="#b07cc6" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
                     <div class="popup-title">Traitement volumineux</div>
                     <div class="popup-message">
                         Votre texte contient <strong>${charCount.toLocaleString()}</strong> caractères.<br>
@@ -183,10 +184,117 @@
     }
 
     // ============================================================
+    // POPUP AUTHENTIFICATION ADMIN
+    // ============================================================
+
+    function showAdminAuthPopup() {
+        const overlay = document.createElement('div');
+        overlay.className = 'popup-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.style.zIndex = '35000';
+        
+        overlay.innerHTML = `
+            <div class="popup-dialog">
+                <div class="popup-icon">
+                    <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+                        <rect x="3" y="11" width="18" height="11" rx="2" stroke="#b07cc6" stroke-width="1.8"/>
+                        <path d="M7 11V7a5 5 0 0110 0v4" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round"/>
+                        <circle cx="12" cy="16" r="1" fill="#b07cc6"/>
+                    </svg>
+                </div>
+                <div class="popup-title">Accès administrateur</div>
+                <div class="popup-message">Entrez le mot de passe pour accéder au tableau de bord.</div>
+                <input type="password" class="popup-input" id="adminAuthPassword" placeholder="Mot de passe..." autocomplete="off">
+                <div class="popup-buttons">
+                    <button class="popup-btn popup-btn-cancel" id="cancelAdminAuth">Annuler</button>
+                    <button class="popup-btn popup-btn-confirm" id="confirmAdminAuth">Accéder</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        const passwordInput = overlay.querySelector('#adminAuthPassword');
+        const confirmBtn = overlay.querySelector('#confirmAdminAuth');
+        const cancelBtn = overlay.querySelector('#cancelAdminAuth');
+        
+        function closeAuth() {
+            if (overlay.parentNode) overlay.remove();
+        }
+        
+        cancelBtn.addEventListener('click', closeAuth);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAuth(); });
+        
+        setTimeout(() => { if (passwordInput) passwordInput.focus(); }, 200);
+        
+        confirmBtn.addEventListener('click', async () => {
+            const password = passwordInput.value.trim();
+            if (!password) {
+                showToast('⚠️ Veuillez entrer le mot de passe.');
+                return;
+            }
+            
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '⏳ Vérification...';
+            
+            try {
+                const response = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/verify-password',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey,
+                        },
+                        body: JSON.stringify({
+                            action: 'verify',
+                            password: password,
+                        }),
+                    }
+                );
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeAuth();
+                    window._adminAuthenticated = true;
+                    openAdminDashboardInternal();
+                } else {
+                    showToast('🔒 ' + (result.message || 'Mot de passe incorrect'));
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+            } catch (e) {
+                showToast('Erreur réseau : ' + e.message);
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Accéder';
+            }
+        });
+        
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmBtn.click();
+            }
+        });
+    }
+
+    // ============================================================
     // TABLEAU DE BORD ADMINISTRATEUR
     // ============================================================
 
     async function openAdminDashboard() {
+        if (window._adminAuthenticated) {
+            openAdminDashboardInternal();
+        } else {
+            showAdminAuthPopup();
+        }
+    }
+
+    async function openAdminDashboardInternal() {
         const overlay = document.getElementById('adminDashboardOverlay');
         if (!overlay) return;
         try {
@@ -223,6 +331,7 @@
     function closeAdminDashboard() {
         const overlay = document.getElementById('adminDashboardOverlay');
         if (overlay) overlay.style.display = 'none';
+        window._adminAuthenticated = false;
     }
 
     async function loadAdminDashboard(isFiltered) {
@@ -264,16 +373,12 @@
     function updateAdminDashboard(data) {
         const { stats, users, servicesRanking } = data;
         
-        // ============================================================
-        // STATS GLOBALES (onglet Utilisateurs)
-        // ============================================================
         document.getElementById('statUsers').textContent = stats.totalUsers;
         document.getElementById('statPurchased').textContent = stats.totalCreditsPurchased;
         document.getElementById('statUsed').textContent = stats.totalCreditsUsed;
         document.getElementById('statUnused').textContent = stats.totalCreditsUnused;
         document.getElementById('statAmount').textContent = stats.totalAmountXAF.toLocaleString() + ' XAF';
         
-        // Rôle le plus fréquent
         const roleCounts = {};
         users.forEach(u => {
             const role = u.user_role || 'utilisateur';
@@ -296,7 +401,6 @@
             topRoleName.textContent = topRole + ' (' + topRoleCount + ' utilisateur' + (topRoleCount > 1 ? 's' : '') + ')';
         }
         
-        // Tableau utilisateurs
         const tbody = document.getElementById('adminTableBody');
         if (tbody) {
             if (users.length === 0) {
@@ -306,7 +410,7 @@
                     <tr>
                         <td>${escapeHTML(u.user_name || 'N/A')}</td>
                         <td>${escapeHTML(u.user_tel || 'N/A')}</td>
-                        <td><span class="role-badge role-${(u.user_role || 'user').toLowerCase()}">${escapeHTML(u.user_role || 'user')}</span></td>
+                        <td><span>${escapeHTML(u.user_role || 'user')}</span></td>
                         <td>${u.credits}</td>
                         <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
                     </tr>
@@ -314,9 +418,6 @@
             }
         }
         
-        // ============================================================
-        // ONGLET TRANSACTIONS
-        // ============================================================
         const totalServices = servicesRanking ? servicesRanking.length : 0;
         let totalCreditsMoved = 0;
         let totalRevenue = 0;
@@ -336,7 +437,6 @@
         if (statTotalCreditsMoved) statTotalCreditsMoved.textContent = totalCreditsMoved;
         if (statTotalRevenue) statTotalRevenue.textContent = totalRevenue.toLocaleString() + ' XAF';
         
-        // Classement des services
         const servicesRankingEl = document.getElementById('servicesRanking');
         if (servicesRankingEl) {
             if (!servicesRanking || servicesRanking.length === 0) {
@@ -360,7 +460,6 @@
             }
         }
         
-        // Classement des rôles
         const sortedRoles = Object.entries(roleCounts).sort((a, b) => b[1] - a[1]);
         const rolesRanking = document.getElementById('rolesRanking');
         if (rolesRanking) {
@@ -394,16 +493,16 @@
                 
                 const tabName = tab.dataset.tab;
                 
-                // Cacher tous les contenus
                 tabUsers.style.display = 'none';
                 tabTransactions.style.display = 'none';
                 if (tabGestion) tabGestion.style.display = 'none';
-                if (adminFilters) adminFilters.style.display = 'none';
                 
-                // Afficher le contenu correspondant
+                if (adminFilters) {
+                    adminFilters.style.display = (tabName === 'users') ? 'flex' : 'none';
+                }
+                
                 if (tabName === 'users') {
                     tabUsers.style.display = 'block';
-                    if (adminFilters) adminFilters.style.display = 'flex';
                 } else if (tabName === 'transactions') {
                     tabTransactions.style.display = 'block';
                 } else if (tabName === 'gestion') {
@@ -415,75 +514,8 @@
     }
 
     function setupGestionTab() {
-        const passwordGate = document.getElementById('passwordGate');
-        const gestionContent = document.getElementById('gestionContent');
-        const verifyBtn = document.getElementById('verifyPasswordBtn');
-        const passwordInput = document.getElementById('gestionPassword');
+        loadGestionUsers();
         
-        // Réinitialiser si déjà validé
-        if (window._gestionUnlocked) {
-            if (passwordGate) passwordGate.style.display = 'none';
-            if (gestionContent) gestionContent.style.display = 'block';
-            loadGestionUsers();
-            return;
-        }
-        
-        if (passwordGate) passwordGate.style.display = 'block';
-        if (gestionContent) gestionContent.style.display = 'none';
-        
-        if (verifyBtn && passwordInput) {
-            const newBtn = verifyBtn.cloneNode(true);
-            verifyBtn.parentNode.replaceChild(newBtn, verifyBtn);
-            
-            newBtn.addEventListener('click', async () => {
-                const password = passwordInput.value.trim();
-                if (!password) {
-                    showToast('⚠️ Veuillez entrer le mot de passe.');
-                    return;
-                }
-                
-                newBtn.disabled = true;
-                newBtn.textContent = '⏳ Vérification...';
-                
-                try {
-                    const response = await fetch(
-                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/verify-password',
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + CreditModule.config.anonKey,
-                                'apikey': CreditModule.config.anonKey,
-                            },
-                            body: JSON.stringify({
-                                action: 'verify',
-                                password: password,
-                            }),
-                        }
-                    );
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        window._gestionUnlocked = true;
-                        passwordGate.style.display = 'none';
-                        gestionContent.style.display = 'block';
-                        loadGestionUsers();
-                    } else {
-                        showToast('🔒 ' + (result.message || 'Mot de passe incorrect'));
-                        passwordInput.value = '';
-                        passwordInput.focus();
-                    }
-                } catch (e) {
-                    showToast('Erreur réseau : ' + e.message);
-                } finally {
-                    newBtn.disabled = false;
-                    newBtn.textContent = 'Valider';
-                }
-            });
-        }
-        
-        // Recherche
         const searchBtn = document.getElementById('gestionSearchBtn');
         if (searchBtn) {
             const newSearchBtn = searchBtn.cloneNode(true);
@@ -584,6 +616,7 @@
                     const result = await response.json();
                     if (result.success) {
                         showToast('✅ Utilisateur supprimé');
+                        await loadAdminDashboard(false);
                         loadGestionUsers();
                     } else {
                         showToast('❌ ' + (result.error || 'Erreur'));
@@ -595,7 +628,6 @@
         );
     };
 
-    // Sauvegarde des modifications utilisateur
     document.addEventListener('click', async (e) => {
         if (e.target.id === 'saveEditBtn') {
             const userId = document.getElementById('editUserId').value;
@@ -629,6 +661,7 @@
                 if (result.success) {
                     showToast('✅ Utilisateur mis à jour');
                     document.getElementById('editUserPopup').style.display = 'none';
+                    await loadAdminDashboard(false);
                     loadGestionUsers();
                 } else {
                     showToast('❌ ' + (result.error || 'Erreur'));
@@ -665,12 +698,10 @@
             setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 300);
         }
         
-        // Gérer l'affichage du champ "Autre"
         const roleSelect = document.getElementById('regRole');
         const roleOtherInput = document.getElementById('regRoleOther');
         
         if (roleSelect && roleOtherInput) {
-            // Réinitialiser
             roleSelect.value = '';
             roleOtherInput.style.display = 'none';
             roleOtherInput.value = '';
@@ -688,7 +719,6 @@
         
         const submitBtn = document.getElementById('registerSubmit');
         if (submitBtn) {
-            // Supprimer les anciens listeners en clonant
             const newBtn = submitBtn.cloneNode(true);
             submitBtn.parentNode.replaceChild(newBtn, submitBtn);
             
@@ -698,7 +728,6 @@
                 const name = document.getElementById('regName')?.value.trim();
                 const phone = document.getElementById('regPhone')?.value.trim();
                 
-                // Récupérer le rôle (menu déroulant ou champ "Autre")
                 let role = document.getElementById('regRole')?.value;
                 if (role === 'Autre') {
                     role = document.getElementById('regRoleOther')?.value.trim();
@@ -709,21 +738,18 @@
                     }
                 }
                 
-                // Validation du nom
                 if (!name) {
                     showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
                     document.getElementById('regName')?.focus();
                     return;
                 }
                 
-                // Validation du téléphone si renseigné
                 if (phone && !/^[67]\d{8}$/.test(phone)) {
                     showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
                     document.getElementById('regPhone')?.focus();
                     return;
                 }
                 
-                // Validation du rôle
                 if (!role) {
                     showToast('⚠️ Veuillez sélectionner votre rôle.');
                     document.getElementById('regRole')?.focus();
@@ -739,7 +765,6 @@
                     cleanup();
                     updateCreditsDisplay();
                     
-                    // Afficher le bouton installer après enregistrement
                     if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
                         setTimeout(() => { DOM.installBtn.style.display = 'inline-flex'; }, 500);
                     }
@@ -752,14 +777,12 @@
             });
         }
         
-        // Bloquer la fermeture
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
             }
         });
         
-        // Bloquer la touche Échap
         document.addEventListener('keydown', function blockEsc(e) {
             if (e.key === 'Escape') {
                 e.preventDefault();
@@ -818,7 +841,7 @@
                 const amountStr = amountInput?.value.trim();
 
                 if (!/^[67]\d{8}$/.test(phone)) {
-                    showToast('📱 Numéro invalide. Exemple : 69xxxxxxx');
+                    showToast('📱 Numéro invalide. Exemple : 696271312');
                     phoneInput?.focus();
                     return;
                 }
@@ -868,8 +891,6 @@
                         throw new Error('Réponse invalide (HTTP ' + response.status + ')');
                     }
 
-                    console.log('Réponse recharge :', JSON.stringify(result, null, 2));
-
                     if (result.success) {
                         await CreditModule.afterRecharge();
                         updateCreditsDisplay();
@@ -881,7 +902,6 @@
                     }
                 } catch (e) {
                     clearTimeout(timeoutId);
-                    console.error('Erreur recharge :', e);
                     if (e.name === 'AbortError') {
                         showToast('⏰ Délai dépassé. Vérifiez votre connexion.');
                     } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
@@ -1496,11 +1516,11 @@
             'formatInfo', 'installBtn',
             'creditsBadge', 'creditsCount', 'rechargeBtn',
             'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip',
-            'regName', 'regPhone', 'regRole',
+            'regName', 'regPhone', 'regRole', 'regRoleOther',
             'voiceSelect',
             'adminDashboardOverlay', 'adminCloseBtn', 'filterName', 'filterPhone', 'filterBtn', 'resetFilterBtn',
-            'gestionPassword', 'verifyPasswordBtn', 'gestionContent', 'gestionSearchBtn',
-            'gestionTableBody', 'editUserPopup', 'editUserId', 'editUserName',
+            'gestionSearchBtn', 'gestionFilterName', 'gestionTableBody',
+            'editUserPopup', 'editUserId', 'editUserName',
             'editUserPhone', 'editUserRole', 'editUserCredits', 'cancelEditBtn', 'saveEditBtn'
         ];
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
