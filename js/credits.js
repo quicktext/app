@@ -143,46 +143,33 @@ const CreditModule = {
         this.userID = window.storage.get('userID', null);
         
         if (!this.userID) {
-            // Générer un ID temporaire (non sauvegardé en base)
             this.userID = 'QT-' + Math.random().toString(36).substring(2, 8).toUpperCase();
             window.storage.set('userID', this.userID);
         }
 
-        // Vérifier si le profil est complété
+        // ✅ Ne JAMAIS créer automatiquement
+        // L'utilisateur sera créé uniquement via le formulaire d'enregistrement
         if (this.isProfileCompleted()) {
-            // Profil existant → charger normalement
-            await this.ensureUser();
+            await this.syncCredits(); // Charger les crédits existants
             await this.loadPricing();
-            this.initialized = true;
         } else {
-            // Profil non complété → ne pas créer en base, utiliser des crédits locaux
-            this.currentCredits = this.config.freeCredits;
-            this.initialized = true;
-            console.log('💰 Crédits temporaires - ' + this.currentCredits + ' crédits');
+            this.currentCredits = 0; // Pas de crédits tant que pas inscrit
         }
         
-        console.log('💰 Module crédits initialisé');
+        this.initialized = true;
+        console.log('💰 Module crédits initialisé - ' + this.currentCredits + ' crédits');
     },
 
-    // Modifier ensureUser pour accepter le mode différé
     async ensureUser() {
+        // ✅ Cette fonction ne doit PLUS créer d'utilisateur
         const user = await this.fetchUser();
         if (user) {
             this.currentCredits = user.credits;
+            window.storage.set('credits', this.currentCredits);
             return;
         }
-        try {
-            await this.insertUser();
-            this.currentCredits = this.config.freeCredits;
-            window.storage.set('credits', this.currentCredits);
-        } catch (e) {
-            if (e.message.includes('duplicate') || e.message.includes('409')) {
-                const userAgain = await this.fetchUser();
-                if (userAgain) this.currentCredits = userAgain.credits;
-            } else {
-                throw e;
-            }
-        }
+        // Si pas d'utilisateur, crédits à 0 (sera créé via auth-user)
+        this.currentCredits = 0;
     },
 
     // Ajouter une fonction pour créer l'utilisateur après inscription
@@ -236,13 +223,6 @@ const CreditModule = {
         const filter = 'user_id=eq.' + encodeURIComponent(this.userID);
         const data = await this.supabaseQuery('/rest/v1/users?select=credits&' + filter);
         return data && data.length > 0 ? data[0] : null;
-    },
-
-    async insertUser() {
-        return await this.supabaseQuery('/rest/v1/users', {
-            method: 'POST',
-            body: JSON.stringify({ user_id: this.userID, credits: this.config.freeCredits })
-        });
     },
 
     // ============================================================
