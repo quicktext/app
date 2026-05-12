@@ -1,6 +1,6 @@
 // QuickText Voice Pro - Application Principale
 // Version finale - Export PDF+TXT avec titre personnalisable
-// Avec OTP MeSomb - Toasts en haut - Popups bloquants
+// Avec OTP MeSomb - Toasts en haut - Popups bloquants - Téléphone obligatoire - Changement de compte
 
 (function() {
     'use strict';
@@ -184,7 +184,7 @@
     }
 
     // ============================================================
-    // POPUP LOGO (Admin ou Contact)
+    // POPUP LOGO (Admin ou Contact) avec "Changer de compte"
     // ============================================================
 
     async function openLogoPopup() {
@@ -245,9 +245,14 @@
                         </svg>
                         WhatsApp
                     </a>
-                    <button class="popup-btn popup-btn-cancel" id="closeContactPopup" style="flex: none; width: 100%;">
-                        Fermer
-                    </button>
+                    <button class="popup-btn popup-btn-cancel" id="closeContactPopup" style="flex: none; width: 100%;">Fermer</button>
+                </div>
+                <p style="margin-top: 12px; font-size: 0.75rem;">
+                    <a href="#" id="showSwitchAccountContact" style="color: var(--text-muted); text-decoration: underline;">Changer de compte</a>
+                </p>
+                <div id="switchAccountSectionContact" style="display: none; margin-top: 12px;">
+                    <input type="tel" class="popup-input" id="switchPhoneContact" placeholder="Nouveau numéro (ex: 696271312)" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
+                    <button class="popup-btn popup-btn-confirm" id="switchAccountBtnContact" style="width: 100%;">Basculer</button>
                 </div>
             </div>
         `;
@@ -259,6 +264,23 @@
         }
         
         overlay.querySelector('#closeContactPopup').addEventListener('click', closeContact);
+        
+        // Changer de compte
+        overlay.querySelector('#showSwitchAccountContact').addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = overlay.querySelector('#switchAccountSectionContact');
+            section.style.display = 'block';
+            setTimeout(() => overlay.querySelector('#switchPhoneContact')?.focus(), 100);
+        });
+        
+        overlay.querySelector('#switchAccountBtnContact').addEventListener('click', async () => {
+            const phone = overlay.querySelector('#switchPhoneContact').value.trim();
+            if (!/^[67]\d{8}$/.test(phone)) {
+                showToast('📱 Numéro invalide. Format : 696271312.');
+                return;
+            }
+            await switchToAccount(phone, overlay);
+        });
     }
 
     function showAdminAuthPopup() {
@@ -283,6 +305,13 @@
                 <div class="popup-buttons">
                     <button class="popup-btn popup-btn-cancel" id="cancelAdminAuth">Annuler</button>
                     <button class="popup-btn popup-btn-confirm" id="confirmAdminAuth">Accéder</button>
+                </div>
+                <p style="margin-top: 12px; font-size: 0.75rem;">
+                    <a href="#" id="showSwitchAccountAdmin" style="color: var(--text-muted); text-decoration: underline;">Changer de compte</a>
+                </p>
+                <div id="switchAccountSectionAdmin" style="display: none; margin-top: 12px;">
+                    <input type="tel" class="popup-input" id="switchPhoneAdmin" placeholder="Nouveau numéro (ex: 696271312)" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
+                    <button class="popup-btn popup-btn-confirm" id="switchAccountBtnAdmin" style="width: 100%;">Basculer</button>
                 </div>
             </div>
         `;
@@ -353,6 +382,62 @@
                 confirmBtn.click();
             }
         });
+        
+        // Changer de compte
+        overlay.querySelector('#showSwitchAccountAdmin').addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = overlay.querySelector('#switchAccountSectionAdmin');
+            section.style.display = 'block';
+            setTimeout(() => overlay.querySelector('#switchPhoneAdmin')?.focus(), 100);
+        });
+        
+        overlay.querySelector('#switchAccountBtnAdmin').addEventListener('click', async () => {
+            const phone = overlay.querySelector('#switchPhoneAdmin').value.trim();
+            if (!/^[67]\d{8}$/.test(phone)) {
+                showToast('📱 Numéro invalide. Format : 696271312.');
+                return;
+            }
+            await switchToAccount(phone, overlay);
+        });
+    }
+
+    // ✅ Fonction générique pour basculer vers un autre compte
+    async function switchToAccount(phone, currentOverlay) {
+        try {
+            // Rechercher le compte
+            const response = await fetch(
+                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                        'apikey': CreditModule.config.anonKey,
+                    },
+                    body: JSON.stringify({
+                        action: 'lookup',
+                        phone: phone,
+                    }),
+                }
+            );
+            
+            const result = await response.json();
+            
+            if (result.success && result.found) {
+                // Fermer le popup actuel
+                if (currentOverlay && currentOverlay.parentNode) {
+                    currentOverlay.remove();
+                }
+                // Afficher le popup "Compte existant trouvé" pour basculer
+                const user = result.user;
+                const fakeOverlay = document.getElementById('registerOverlay');
+                showAccountFoundPopup(user, phone, fakeOverlay);
+            } else {
+                showToast('❌ Aucun compte trouvé avec ce numéro.');
+            }
+        } catch (e) {
+            showToast('Erreur réseau : ' + e.message);
+        }
     }
 
     // ============================================================
@@ -746,7 +831,7 @@
     });
 
     // ============================================================
-    // POP-UP ENREGISTREMENT UTILISATEUR (bloquant)
+    // POP-UP ENREGISTREMENT UTILISATEUR (bloquant, téléphone obligatoire)
     // ============================================================
 
     function showRegisterPopup() {
@@ -786,23 +871,28 @@
             const newBtn = submitBtn.cloneNode(true);
             submitBtn.parentNode.replaceChild(newBtn, submitBtn);
             
-            let lookupDone = false;
-            
             newBtn.addEventListener('click', async function handler(e) {
                 e.preventDefault();
                 
                 const phone = document.getElementById('regPhone')?.value.trim();
                 const name = document.getElementById('regName')?.value.trim();
                 
-                if (!name) {
-                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
-                    document.getElementById('regName')?.focus();
+                // ✅ Téléphone obligatoire
+                if (!phone) {
+                    showToast('⚠️ Le numéro de téléphone est obligatoire.');
+                    document.getElementById('regPhone')?.focus();
                     return;
                 }
                 
-                if (phone && !/^[67]\d{8}$/.test(phone)) {
+                if (!/^[67]\d{8}$/.test(phone)) {
                     showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
                     document.getElementById('regPhone')?.focus();
+                    return;
+                }
+                
+                if (!name) {
+                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
+                    document.getElementById('regName')?.focus();
                     return;
                 }
                 
@@ -825,45 +915,38 @@
                 newBtn.disabled = true;
                 newBtn.textContent = '⏳ Recherche...';
                 
-                // Étape 1 : Rechercher si le compte existe avec ce numéro
-                if (phone && !lookupDone) {
-                    try {
-                        const response = await fetch(
-                            'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
-                            {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': 'Bearer ' + CreditModule.config.anonKey,
-                                    'apikey': CreditModule.config.anonKey,
-                                },
-                                body: JSON.stringify({
-                                    action: 'lookup',
-                                    phone: phone,
-                                }),
-                            }
-                        );
-                        
-                        const result = await response.json();
-                        lookupDone = true;
-                        
-                        if (result.success && result.found) {
-                            // ✅ Compte trouvé : fermer l'enregistrement, ouvrir connexion
-                            overlay.style.display = 'none';
-                            newBtn.disabled = false;
-                            newBtn.textContent = 'Enregistrer';
-                            showAccountFoundPopup(result.user, phone, overlay);
-                            return;
-                        }
-                    } catch (e) {
-                        console.warn('Erreur recherche compte :', e);
-                    }
-                }
-                
-                // Étape 2 : Aucun compte trouvé → Créer le compte
-                newBtn.textContent = '⏳ Création...';
-                
+                // Vérifier si le numéro existe déjà
                 try {
+                    const response = await fetch(
+                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                                'apikey': CreditModule.config.anonKey,
+                            },
+                            body: JSON.stringify({
+                                action: 'lookup',
+                                phone: phone,
+                            }),
+                        }
+                    );
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && result.found) {
+                        // ✅ Numéro déjà utilisé → proposer connexion
+                        overlay.style.display = 'none';
+                        newBtn.disabled = false;
+                        newBtn.textContent = 'Enregistrer';
+                        showAccountFoundPopup(result.user, phone, overlay);
+                        return;
+                    }
+                    
+                    // ✅ Numéro libre → Créer le compte
+                    newBtn.textContent = '⏳ Création...';
+                    
                     await CreditModule.createUserAfterRegistration(name, phone, role);
                     showToast('✅ Bienvenue ' + name + ' !');
                     overlay.style.display = 'none';
@@ -921,16 +1004,17 @@
             if (overlay.parentNode) overlay.remove();
         }
         
-        // "Nouveau compte" → réouvrir l'enregistrement avec numéro vierge
+        // "Nouveau compte" → refuser, revenir à l'enregistrement avec numéro vierge
         overlay.querySelector('#cancelLinkAccount').addEventListener('click', () => {
             closeLinkPopup();
-            if (registerOverlay) {
-                // Vider le champ téléphone pour que l'utilisateur entre un nouveau numéro
-                const phoneInput = document.getElementById('regPhone');
-                if (phoneInput) phoneInput.value = '';
-                registerOverlay.style.display = 'flex';
-                document.getElementById('regPhone')?.focus();
+            // Ce numéro est déjà pris, on vide le champ pour forcer un autre numéro
+            const phoneInput = document.getElementById('regPhone');
+            if (phoneInput) {
+                phoneInput.value = '';
+                phoneInput.focus();
             }
+            if (registerOverlay) registerOverlay.style.display = 'flex';
+            showToast('⚠️ Ce numéro est déjà utilisé. Veuillez entrer un autre numéro.');
         });
         
         // "Se connecter" → envoyer OTP
@@ -1025,8 +1109,8 @@
         // Annuler → revenir au popup "Compte existant trouvé"
         cancelBtn.addEventListener('click', () => {
             closeOTPPopup();
-            if (accountFoundOverlay) {
-                document.body.appendChild(accountFoundOverlay);
+            if (accountFoundOverlay && accountFoundOverlay.parentNode) {
+                // Le popup compte existant est déjà dans le DOM, on le réaffiche
                 accountFoundOverlay.style.display = 'flex';
             }
         });
