@@ -1714,6 +1714,52 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* Password gate */
+        .password-gate {
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .password-gate h4 {
+            margin-bottom: 16px;
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        /* Popup édition */
+        .edit-user-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-popup);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            width: 90%;
+            max-width: 420px;
+            z-index: 31000;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            animation: popupIn 0.25s ease;
+        }
+
+        .edit-user-popup h4 {
+            margin-bottom: 16px;
+            text-align: center;
+            color: var(--text);
+        }
+
+        .edit-user-popup .popup-input {
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        /* Boutons actions gestion */
+        .gestion-actions {
+            display: flex;
+            gap: 4px;
+        }
+
     </style>
 </head>
 <body>
@@ -2005,46 +2051,55 @@
                 </button>
             </div>
             
+            <!-- Onglets -->
             <div class="admin-tabs">
                 <button class="admin-tab active" data-tab="users">Utilisateurs</button>
                 <button class="admin-tab" data-tab="transactions">Transactions</button>
+                <button class="admin-tab" data-tab="gestion">Gestion</button>
             </div>
             
-            <div class="admin-stats" id="adminStatsContainer">
-                <div class="stat-card">
-                    <div class="stat-value" id="statUsers">0</div>
-                    <div class="stat-label">Utilisateurs</div>
+            <!-- PARTIE FIXE POUR TOUS LES ONGLETS -->
+            <div class="admin-fixed-section">
+                <!-- Stats globales -->
+                <div class="admin-stats" id="adminStatsContainer">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statUsers">0</div>
+                        <div class="stat-label">Utilisateurs</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statPurchased">0</div>
+                        <div class="stat-label">Crédits achetés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statUsed">0</div>
+                        <div class="stat-label">Crédits utilisés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statUnused">0</div>
+                        <div class="stat-label">Crédits restants</div>
+                    </div>
+                    <div class="stat-card highlight">
+                        <div class="stat-value" id="statAmount">0 XAF</div>
+                        <div class="stat-label">Montant total</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statPurchased">0</div>
-                    <div class="stat-label">Crédits achetés</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statUsed">0</div>
-                    <div class="stat-label">Crédits utilisés</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statUnused">0</div>
-                    <div class="stat-label">Crédits restants</div>
-                </div>
-                <div class="stat-card highlight">
-                    <div class="stat-value" id="statAmount">0 XAF</div>
-                    <div class="stat-label">Montant total</div>
+                
+                <!-- Rôle le plus fréquent -->
+                <div class="admin-top-role" id="adminTopRole" style="display:none;">
+                    Rôle le plus fréquent : <strong id="topRoleName">-</strong>
                 </div>
             </div>
+            <!-- FIN PARTIE FIXE -->
             
-            <div class="admin-top-role" id="adminTopRole" style="display:none;">
-                Rôle le plus fréquent : <strong id="topRoleName">-</strong>
-            </div>
-            
-            <div class="admin-filters" id="adminFilters">
-                <input type="text" class="popup-input" id="filterName" placeholder="Filtrer par nom...">
-                <input type="tel" class="popup-input" id="filterPhone" placeholder="Filtrer par téléphone...">
-                <button id="filterBtn" class="filter-btn">Filtrer</button>
-                <button id="resetFilterBtn" class="filter-btn filter-btn-secondary">Réinitialiser</button>
-            </div>
-            
+            <!-- PARTIE VARIABLE SELON L'ONGLET -->
+            <!-- Onglet Utilisateurs -->
             <div id="tabUsers" class="admin-tab-content active">
+                <div class="admin-filters" id="adminFilters">
+                    <input type="text" class="popup-input" id="filterName" placeholder="Filtrer par nom...">
+                    <input type="tel" class="popup-input" id="filterPhone" placeholder="Filtrer par téléphone...">
+                    <button id="filterBtn" class="filter-btn">Filtrer</button>
+                    <button id="resetFilterBtn" class="filter-btn filter-btn-secondary">Réinitialiser</button>
+                </div>
                 <div class="admin-table-container">
                     <table class="admin-table">
                         <thead>
@@ -2063,6 +2118,7 @@
                 </div>
             </div>
             
+            <!-- Onglet Transactions -->
             <div id="tabTransactions" class="admin-tab-content" style="display:none;">
                 <div class="admin-stats" id="transactionStatsContainer">
                     <div class="stat-card">
@@ -2087,6 +2143,66 @@
                 <div class="admin-ranking-section">
                     <h4>Rôles les plus fréquents</h4>
                     <div id="rolesRanking" class="ranking-list"></div>
+                </div>
+            </div>
+            
+            <!-- Onglet Gestion -->
+            <div id="tabGestion" class="admin-tab-content" style="display:none;">
+                <!-- Popup mot de passe -->
+                <div id="passwordGate" class="password-gate">
+                    <h4>🔐 Authentification requise</h4>
+                    <input type="password" class="popup-input" id="gestionPassword" placeholder="Mot de passe administrateur..." autocomplete="off">
+                    <button id="verifyPasswordBtn" class="filter-btn" style="width: 100%; margin-top: 8px;">Valider</button>
+                </div>
+                
+                <!-- Contenu gestion (caché tant que le mot de passe n'est pas validé) -->
+                <div id="gestionContent" style="display: none;">
+                    <div class="admin-filters" style="margin-bottom: 14px;">
+                        <input type="text" class="popup-input" id="gestionFilterName" placeholder="Rechercher un utilisateur...">
+                        <button id="gestionSearchBtn" class="filter-btn">Rechercher</button>
+                    </div>
+                    
+                    <div class="admin-table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Téléphone</th>
+                                    <th>Rôle</th>
+                                    <th>Crédits</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gestionTableBody">
+                                <tr><td colspan="5" style="text-align:center;padding:20px;">Authentifiez-vous pour accéder à la gestion</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Popup édition utilisateur -->
+                    <div id="editUserPopup" class="edit-user-popup" style="display: none;">
+                        <h4>Modifier l'utilisateur</h4>
+                        <input type="hidden" id="editUserId">
+                        <input type="text" class="popup-input" id="editUserName" placeholder="Nom complet">
+                        <input type="tel" class="popup-input" id="editUserPhone" placeholder="Téléphone">
+                        <select class="popup-input" id="editUserRole" style="text-align: left;">
+                            <option value="user">Utilisateur</option>
+                            <option value="admin">Admin</option>
+                            <option value="Élève">Élève</option>
+                            <option value="Étudiant(e)">Étudiant(e)</option>
+                            <option value="Enseignant(e)">Enseignant(e)</option>
+                            <option value="Écrivain">Écrivain</option>
+                            <option value="Journaliste">Journaliste</option>
+                            <option value="Avocat">Avocat</option>
+                            <option value="Secrétaire">Secrétaire</option>
+                            <option value="Chercheur">Chercheur</option>
+                        </select>
+                        <input type="number" class="popup-input" id="editUserCredits" placeholder="Crédits" min="0">
+                        <div class="popup-buttons">
+                            <button class="popup-btn popup-btn-cancel" id="cancelEditBtn">Annuler</button>
+                            <button class="popup-btn popup-btn-confirm" id="saveEditBtn">Enregistrer</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

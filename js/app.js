@@ -384,6 +384,7 @@
         const tabs = document.querySelectorAll('.admin-tab');
         const tabUsers = document.getElementById('tabUsers');
         const tabTransactions = document.getElementById('tabTransactions');
+        const tabGestion = document.getElementById('tabGestion');
         const adminFilters = document.getElementById('adminFilters');
         
         tabs.forEach(tab => {
@@ -393,18 +394,254 @@
                 
                 const tabName = tab.dataset.tab;
                 
+                // Cacher tous les contenus
+                tabUsers.style.display = 'none';
+                tabTransactions.style.display = 'none';
+                if (tabGestion) tabGestion.style.display = 'none';
+                if (adminFilters) adminFilters.style.display = 'none';
+                
+                // Afficher le contenu correspondant
                 if (tabName === 'users') {
                     tabUsers.style.display = 'block';
-                    tabTransactions.style.display = 'none';
                     if (adminFilters) adminFilters.style.display = 'flex';
                 } else if (tabName === 'transactions') {
-                    tabUsers.style.display = 'none';
                     tabTransactions.style.display = 'block';
-                    if (adminFilters) adminFilters.style.display = 'none';
+                } else if (tabName === 'gestion') {
+                    if (tabGestion) tabGestion.style.display = 'block';
+                    setupGestionTab();
                 }
             });
         });
     }
+
+    function setupGestionTab() {
+        const passwordGate = document.getElementById('passwordGate');
+        const gestionContent = document.getElementById('gestionContent');
+        const verifyBtn = document.getElementById('verifyPasswordBtn');
+        const passwordInput = document.getElementById('gestionPassword');
+        
+        // Réinitialiser si déjà validé
+        if (window._gestionUnlocked) {
+            if (passwordGate) passwordGate.style.display = 'none';
+            if (gestionContent) gestionContent.style.display = 'block';
+            loadGestionUsers();
+            return;
+        }
+        
+        if (passwordGate) passwordGate.style.display = 'block';
+        if (gestionContent) gestionContent.style.display = 'none';
+        
+        if (verifyBtn && passwordInput) {
+            const newBtn = verifyBtn.cloneNode(true);
+            verifyBtn.parentNode.replaceChild(newBtn, verifyBtn);
+            
+            newBtn.addEventListener('click', async () => {
+                const password = passwordInput.value.trim();
+                if (!password) {
+                    showToast('⚠️ Veuillez entrer le mot de passe.');
+                    return;
+                }
+                
+                newBtn.disabled = true;
+                newBtn.textContent = '⏳ Vérification...';
+                
+                try {
+                    const response = await fetch(
+                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/verify-password',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                                'apikey': CreditModule.config.anonKey,
+                            },
+                            body: JSON.stringify({
+                                action: 'verify',
+                                password: password,
+                            }),
+                        }
+                    );
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        window._gestionUnlocked = true;
+                        passwordGate.style.display = 'none';
+                        gestionContent.style.display = 'block';
+                        loadGestionUsers();
+                    } else {
+                        showToast('🔒 ' + (result.message || 'Mot de passe incorrect'));
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
+                } catch (e) {
+                    showToast('Erreur réseau : ' + e.message);
+                } finally {
+                    newBtn.disabled = false;
+                    newBtn.textContent = 'Valider';
+                }
+            });
+        }
+        
+        // Recherche
+        const searchBtn = document.getElementById('gestionSearchBtn');
+        if (searchBtn) {
+            const newSearchBtn = searchBtn.cloneNode(true);
+            searchBtn.parentNode.replaceChild(newSearchBtn, searchBtn);
+            newSearchBtn.addEventListener('click', loadGestionUsers);
+        }
+    }
+
+    async function loadGestionUsers() {
+        const tbody = document.getElementById('gestionTableBody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Chargement...</td></tr>';
+        
+        const searchName = document.getElementById('gestionFilterName')?.value.trim() || '';
+        
+        try {
+            const response = await fetch(
+                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/admin-dashboard',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                        'apikey': CreditModule.config.anonKey,
+                    },
+                    body: JSON.stringify({
+                        action: 'getDashboard',
+                        userId: CreditModule.userID,
+                        searchName: searchName || null,
+                    }),
+                }
+            );
+            
+            const result = await response.json();
+            
+            if (result.success && result.data.users.length > 0) {
+                tbody.innerHTML = result.data.users.map(u => `
+                    <tr>
+                        <td>${escapeHTML(u.user_name || 'N/A')}</td>
+                        <td>${escapeHTML(u.user_tel || 'N/A')}</td>
+                        <td>${escapeHTML(u.user_role || 'user')}</td>
+                        <td>${u.credits}</td>
+                        <td>
+                            <button class="filter-btn" style="padding:4px 8px;font-size:0.7rem;margin-right:4px;" 
+                                    onclick="editGestionUser('${u.user_id}', '${escapeHTML(u.user_name || '')}', '${escapeHTML(u.user_tel || '')}', '${escapeHTML(u.user_role || 'user')}', ${u.credits})">
+                                Modifier
+                            </button>
+                            <button class="filter-btn-secondary" style="padding:4px 8px;font-size:0.7rem;" 
+                                    onclick="deleteGestionUser('${u.user_id}', '${escapeHTML(u.user_name || 'N/A')}')">
+                                Supprimer
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Aucun utilisateur trouvé</td></tr>';
+            }
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Erreur de chargement</td></tr>';
+        }
+    }
+
+    window.editGestionUser = function(userId, name, phone, role, credits) {
+        document.getElementById('editUserId').value = userId;
+        document.getElementById('editUserName').value = name;
+        document.getElementById('editUserPhone').value = phone;
+        document.getElementById('editUserRole').value = role;
+        document.getElementById('editUserCredits').value = credits;
+        document.getElementById('editUserPopup').style.display = 'block';
+    };
+
+    window.deleteGestionUser = function(userId, userName) {
+        showConfirmPopup(
+            'Supprimer utilisateur',
+            'Voulez-vous vraiment supprimer "' + userName + '" ?\nCette action est irréversible.',
+            '<svg viewBox="0 0 24 24" fill="none" width="28" height="28"><path d="M4 6h16" stroke="#f08080" stroke-width="1.8" stroke-linecap="round"/><path d="M5 6l1 14a1 1 0 001 1h10a1 1 0 001-1l1-14" stroke="#f08080" stroke-width="1.8" fill="none"/></svg>',
+            'Supprimer',
+            async () => {
+                try {
+                    const response = await fetch(
+                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/manage-users',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                                'apikey': CreditModule.config.anonKey,
+                            },
+                            body: JSON.stringify({
+                                action: 'delete',
+                                userId: CreditModule.userID,
+                                targetUserId: userId,
+                            }),
+                        }
+                    );
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        showToast('✅ Utilisateur supprimé');
+                        loadGestionUsers();
+                    } else {
+                        showToast('❌ ' + (result.error || 'Erreur'));
+                    }
+                } catch (e) {
+                    showToast('Erreur réseau');
+                }
+            }
+        );
+    };
+
+    // Sauvegarde des modifications utilisateur
+    document.addEventListener('click', async (e) => {
+        if (e.target.id === 'saveEditBtn') {
+            const userId = document.getElementById('editUserId').value;
+            const updates = {
+                user_name: document.getElementById('editUserName').value.trim(),
+                user_tel: document.getElementById('editUserPhone').value.trim(),
+                user_role: document.getElementById('editUserRole').value,
+                credits: parseInt(document.getElementById('editUserCredits').value) || 0,
+            };
+            
+            try {
+                const response = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/manage-users',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey,
+                        },
+                        body: JSON.stringify({
+                            action: 'update',
+                            userId: CreditModule.userID,
+                            targetUserId: userId,
+                            updates: updates,
+                        }),
+                    }
+                );
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast('✅ Utilisateur mis à jour');
+                    document.getElementById('editUserPopup').style.display = 'none';
+                    loadGestionUsers();
+                } else {
+                    showToast('❌ ' + (result.error || 'Erreur'));
+                }
+            } catch (e) {
+                showToast('Erreur réseau');
+            }
+        }
+        
+        if (e.target.id === 'cancelEditBtn') {
+            document.getElementById('editUserPopup').style.display = 'none';
+        }
+    });
 
     // ============================================================
     // POP-UP ENREGISTREMENT UTILISATEUR
@@ -1261,7 +1498,10 @@
             'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip',
             'regName', 'regPhone', 'regRole',
             'voiceSelect',
-            'adminDashboardOverlay', 'adminCloseBtn', 'filterName', 'filterPhone', 'filterBtn', 'resetFilterBtn'
+            'adminDashboardOverlay', 'adminCloseBtn', 'filterName', 'filterPhone', 'filterBtn', 'resetFilterBtn',
+            'gestionPassword', 'verifyPasswordBtn', 'gestionContent', 'gestionSearchBtn',
+            'gestionTableBody', 'editUserPopup', 'editUserId', 'editUserName',
+            'editUserPhone', 'editUserRole', 'editUserCredits', 'cancelEditBtn', 'saveEditBtn'
         ];
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
     }
