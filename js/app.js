@@ -1,6 +1,6 @@
 // QuickText Voice Pro - Application Principale
 // Version finale - Export PDF+TXT avec titre personnalisable
-// Avec OTP MeSomb - Toasts en haut
+// Avec OTP MeSomb - Toasts en haut - Popups bloquants
 
 (function() {
     'use strict';
@@ -157,7 +157,7 @@
     function confirmLargeProcessing(charCount, cost) {
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
-            overlay.className = 'popup-overlay';
+            overlay.className = 'popup-overlay popup-blocking';
             overlay.setAttribute('role', 'dialog');
             overlay.innerHTML = `
                 <div class="popup-dialog">
@@ -180,7 +180,6 @@
             document.body.appendChild(overlay);
             overlay.querySelector('#cancelLargeIA').onclick = () => { overlay.remove(); resolve(false); };
             overlay.querySelector('#confirmLargeIA').onclick = () => { overlay.remove(); resolve(true); };
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
         });
     }
 
@@ -218,7 +217,7 @@
 
     function showContactPopup() {
         const overlay = document.createElement('div');
-        overlay.className = 'popup-overlay';
+        overlay.className = 'popup-overlay popup-blocking';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.style.zIndex = '35000';
@@ -260,12 +259,11 @@
         }
         
         overlay.querySelector('#closeContactPopup').addEventListener('click', closeContact);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeContact(); });
     }
 
     function showAdminAuthPopup() {
         const overlay = document.createElement('div');
-        overlay.className = 'popup-overlay';
+        overlay.className = 'popup-overlay popup-blocking';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.style.zIndex = '35000';
@@ -300,7 +298,6 @@
         }
         
         cancelBtn.addEventListener('click', closeAuth);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAuth(); });
         
         setTimeout(() => { if (passwordInput) passwordInput.focus(); }, 200);
         
@@ -749,7 +746,7 @@
     });
 
     // ============================================================
-    // POP-UP ENREGISTREMENT UTILISATEUR
+    // POP-UP ENREGISTREMENT UTILISATEUR (bloquant)
     // ============================================================
 
     function showRegisterPopup() {
@@ -764,10 +761,6 @@
             const phoneInput = document.getElementById('regPhone');
             if (phoneInput) phoneInput.focus();
         }, 400);
-        
-        function cleanup() {
-            overlay.style.display = 'none';
-        }
         
         const roleSelect = document.getElementById('regRole');
         const roleOtherInput = document.getElementById('regRoleOther');
@@ -832,7 +825,7 @@
                 newBtn.disabled = true;
                 newBtn.textContent = '⏳ Recherche...';
                 
-                // Étape 1 : Rechercher si le compte existe
+                // Étape 1 : Rechercher si le compte existe avec ce numéro
                 if (phone && !lookupDone) {
                     try {
                         const response = await fetch(
@@ -855,11 +848,11 @@
                         lookupDone = true;
                         
                         if (result.success && result.found) {
-                            // ✅ Fermer le popup d'enregistrement
+                            // ✅ Compte trouvé : fermer l'enregistrement, ouvrir connexion
                             overlay.style.display = 'none';
                             newBtn.disabled = false;
                             newBtn.textContent = 'Enregistrer';
-                            showAccountFoundPopup(result.user, phone, name, role, overlay);
+                            showAccountFoundPopup(result.user, phone, overlay);
                             return;
                         }
                     } catch (e) {
@@ -867,13 +860,13 @@
                     }
                 }
                 
-                // Étape 2 : Créer le compte
+                // Étape 2 : Aucun compte trouvé → Créer le compte
                 newBtn.textContent = '⏳ Création...';
                 
                 try {
                     await CreditModule.createUserAfterRegistration(name, phone, role);
                     showToast('✅ Bienvenue ' + name + ' !');
-                    cleanup();
+                    overlay.style.display = 'none';
                     updateCreditsDisplay();
                     
                     if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
@@ -887,28 +880,15 @@
                 }
             });
         }
-        
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
-            }
-        });
-        
-        document.addEventListener('keydown', function blockEsc(e) {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
-            }
-        }, { once: false });
     }
 
     // ============================================================
-    // POPUP COMPTE EXISTANT TROUVÉ
+    // POPUP COMPTE EXISTANT TROUVÉ (bloquant)
     // ============================================================
 
-    function showAccountFoundPopup(user, phone, name, role, registerOverlay) {
+    function showAccountFoundPopup(user, phone, registerOverlay) {
         const overlay = document.createElement('div');
-        overlay.className = 'popup-overlay';
+        overlay.className = 'popup-overlay popup-blocking';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.style.zIndex = '35000';
@@ -941,31 +921,19 @@
             if (overlay.parentNode) overlay.remove();
         }
         
-        overlay.querySelector('#cancelLinkAccount').addEventListener('click', async () => {
+        // "Nouveau compte" → réouvrir l'enregistrement avec numéro vierge
+        overlay.querySelector('#cancelLinkAccount').addEventListener('click', () => {
             closeLinkPopup();
-            // ✅ Réouvrir le popup d'enregistrement
             if (registerOverlay) {
+                // Vider le champ téléphone pour que l'utilisateur entre un nouveau numéro
+                const phoneInput = document.getElementById('regPhone');
+                if (phoneInput) phoneInput.value = '';
                 registerOverlay.style.display = 'flex';
-            }
-            const submitBtn = document.getElementById('registerSubmit');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.textContent = '⏳ Création...';
-            }
-            try {
-                await CreditModule.createUserAfterRegistration(name, phone, role);
-                showToast('✅ Bienvenue ' + name + ' !');
-                if (registerOverlay) registerOverlay.style.display = 'none';
-                updateCreditsDisplay();
-            } catch (e) {
-                showToast('❌ Erreur : ' + e.message);
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Enregistrer';
-                }
+                document.getElementById('regPhone')?.focus();
             }
         });
         
+        // "Se connecter" → envoyer OTP
         overlay.querySelector('#confirmLinkAccount').addEventListener('click', async () => {
             const confirmBtn = overlay.querySelector('#confirmLinkAccount');
             confirmBtn.disabled = true;
@@ -992,7 +960,7 @@
                 
                 if (otpResult.success) {
                     closeLinkPopup();
-                    showOTPVerificationPopup(phone, user, registerOverlay);
+                    showOTPVerificationPopup(phone, user, registerOverlay, overlay);
                 } else {
                     showToast('❌ Erreur envoi OTP : ' + (otpResult.error || 'Réessayez'));
                     confirmBtn.disabled = false;
@@ -1004,19 +972,15 @@
                 confirmBtn.textContent = 'Se connecter';
             }
         });
-        
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) closeLinkPopup();
-        });
     }
 
     // ============================================================
-    // POPUP VÉRIFICATION OTP
+    // POPUP VÉRIFICATION OTP (bloquant)
     // ============================================================
 
-    function showOTPVerificationPopup(phone, user, registerOverlay) {
+    function showOTPVerificationPopup(phone, user, registerOverlay, accountFoundOverlay) {
         const overlay = document.createElement('div');
-        overlay.className = 'popup-overlay';
+        overlay.className = 'popup-overlay popup-blocking';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.style.zIndex = '36000';
@@ -1058,8 +1022,14 @@
             if (overlay.parentNode) overlay.remove();
         }
         
-        cancelBtn.addEventListener('click', closeOTPPopup);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOTPPopup(); });
+        // Annuler → revenir au popup "Compte existant trouvé"
+        cancelBtn.addEventListener('click', () => {
+            closeOTPPopup();
+            if (accountFoundOverlay) {
+                document.body.appendChild(accountFoundOverlay);
+                accountFoundOverlay.style.display = 'flex';
+            }
+        });
         
         setTimeout(() => { if (otpInput) otpInput.focus(); }, 300);
         
@@ -1319,12 +1289,8 @@
     function showConfirmPopup(title, message, iconSVG, confirmText, onConfirm) {
         const existing = document.querySelector('.popup-overlay');
         if (existing) existing.remove();
-        if (window._popupEscHandler) {
-            document.removeEventListener('keydown', window._popupEscHandler);
-            window._popupEscHandler = null;
-        }
         const overlay = document.createElement('div');
-        overlay.className = 'popup-overlay';
+        overlay.className = 'popup-overlay popup-blocking';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.innerHTML = `
@@ -1345,10 +1311,6 @@
         function close() {
             if (resolved) return;
             resolved = true;
-            if (window._popupEscHandler) {
-                document.removeEventListener('keydown', window._popupEscHandler);
-                window._popupEscHandler = null;
-            }
             overlay.style.opacity = '0';
             overlay.style.transition = 'opacity 0.2s ease';
             setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 200);
@@ -1360,25 +1322,11 @@
         }
         cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
         confirmBtn.addEventListener('click', (e) => { e.stopPropagation(); confirm(); });
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        const dialogEl = overlay.querySelector('.popup-dialog');
-        if (dialogEl) dialogEl.addEventListener('click', (e) => e.stopPropagation());
-        window._popupEscHandler = (e) => {
-            if (e.key === 'Escape') { e.preventDefault(); close(); }
-            if (e.key === 'Enter') { e.preventDefault(); confirm(); }
-        };
-        document.addEventListener('keydown', window._popupEscHandler);
-        setTimeout(() => { if (cancelBtn && cancelBtn.parentNode) cancelBtn.focus(); }, 100);
-        return overlay;
     }
 
     function showExportPDFPopup(text, iconSVG, defaultTitle, estimatedPages, pdfCost) {
         const existing = document.querySelector('.popup-overlay');
         if (existing) existing.remove();
-        if (window._popupEscHandler) {
-            document.removeEventListener('keydown', window._popupEscHandler);
-            window._popupEscHandler = null;
-        }
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
         overlay.setAttribute('role', 'dialog');
@@ -1448,11 +1396,8 @@
         let themeColor = '#9b59b6';
         let resolved = false;
         hideBrandingCheckbox.addEventListener('change', () => {
-            if (hideBrandingCheckbox.checked) {
-                extraOptions.classList.add('visible');
-            } else {
-                extraOptions.classList.remove('visible');
-            }
+            if (hideBrandingCheckbox.checked) extraOptions.classList.add('visible');
+            else extraOptions.classList.remove('visible');
         });
         logoInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -1473,24 +1418,11 @@
             if (val && !val.startsWith('#')) val = '#' + val;
             hexInput.value = val;
             themeColor = val || '#9b59b6';
-            if (/^#[0-9a-f]{6}$/i.test(val)) {
-                hexPreview.style.background = val;
-            }
-        });
-        hexInput.addEventListener('blur', () => {
-            const val = hexInput.value.trim();
-            if (/^#[0-9a-f]{6}$/i.test(val)) {
-                hexPreview.style.background = val;
-                hexPreview.style.border = '2px solid var(--border)';
-            }
+            if (/^#[0-9a-f]{6}$/i.test(val)) hexPreview.style.background = val;
         });
         function close() {
             if (resolved) return;
             resolved = true;
-            if (window._popupEscHandler) {
-                document.removeEventListener('keydown', window._popupEscHandler);
-                window._popupEscHandler = null;
-            }
             overlay.style.opacity = '0';
             overlay.style.transition = 'opacity 0.2s ease';
             setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 200);
@@ -1514,32 +1446,16 @@
                     if (typeof PDFExportModule !== 'undefined') {
                         PDFExportModule.exportToPDF(text, finalTitle, hideBranding, customOptions);
                         CreditModule.useCredits('pdf_export', pdfCost)
-                            .then(() => {
-                                updateCreditsDisplay();
-                                showToast('✅ PDF exporté ! (' + pdfCost + ' crédits)');
-                            })
+                            .then(() => { updateCreditsDisplay(); showToast('✅ PDF exporté ! (' + pdfCost + ' crédits)'); })
                             .catch(() => {});
-                    } else {
-                        throw new Error('Module PDF non disponible');
-                    }
-                } catch (e) {
-                    console.error('Erreur PDF:', e);
-                    showToast('Erreur PDF: ' + e.message);
-                }
+                    } else throw new Error('Module PDF non disponible');
+                } catch (e) { showToast('Erreur PDF: ' + e.message); }
             }, 250);
         }
         cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
         confirmBtn.addEventListener('click', (e) => { e.stopPropagation(); confirm(); });
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        const dialogEl = overlay.querySelector('.popup-dialog');
-        if (dialogEl) dialogEl.addEventListener('click', (e) => e.stopPropagation());
-        if (extraOptions) extraOptions.addEventListener('click', (e) => e.stopPropagation());
-        if (inputField) {
-            inputField.addEventListener('click', (e) => e.stopPropagation());
-            inputField.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirm(); } });
-        }
-        window._popupEscHandler = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
-        document.addEventListener('keydown', window._popupEscHandler);
+        if (inputField) inputField.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirm(); } });
         setTimeout(() => { if (inputField) { inputField.focus(); inputField.select(); } }, 150);
         return overlay;
     }
@@ -1586,63 +1502,30 @@
             const newCharsCount = Math.max(0, currentText.length - baseText.length);
             if (newCharsCount > 0) {
                 const dictationCost = CreditModule.getServiceCost('dictation', newCharsCount);
-                try {
-                    await CreditModule.useCredits('dictation', dictationCost);
-                    updateCreditsDisplay();
-                } catch(e) {}
+                try { await CreditModule.useCredits('dictation', dictationCost); updateCreditsDisplay(); } catch(e) {}
             }
             state._baseTextBeforeDictation = '';
             return;
         }
-        if (CreditModule.currentCredits < 1) {
-            showToast('💰 Crédits insuffisants pour la dictée.');
-            return;
-        }
+        if (CreditModule.currentCredits < 1) { showToast('💰 Crédits insuffisants pour la dictée.'); return; }
         try {
             if (navigator.permissions && navigator.permissions.query) {
-                try {
-                    const status = await navigator.permissions.query({ name: 'microphone' });
-                    if (status.state === 'denied') {
-                        showToast('🎤 Microphone bloqué. Activez-le dans les paramètres.');
-                        return;
-                    }
-                } catch(e) {}
+                try { if ((await navigator.permissions.query({ name: 'microphone' })).state === 'denied') { showToast('🎤 Microphone bloqué.'); return; } } catch(e) {}
             }
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
             stream.getTracks().forEach(t => t.stop());
             state._lastInterimText = '';
             state._baseTextBeforeDictation = DOM.output ? DOM.output.value : '';
-            await SpeechModule.startRecognition(
-                state.currentLang,
-                (fullText, interimText) => {
-                    const baseText = state._baseTextBeforeDictation || '';
-                    state.fullTranscript = baseText + fullText;
-                    let displayText = baseText + fullText;
-                    if (interimText && interimText.trim() && interimText !== state._lastInterimText) {
-                        displayText += interimText;
-                        state._lastInterimText = interimText;
-                    }
-                    if (DOM.output) {
-                        DOM.output.value = displayText;
-                        DOM.output.scrollTop = DOM.output.scrollHeight;
-                    }
-                },
-                (error) => {
-                    showToast(error);
-                    resetRecordButton();
-                    updateModeIndicator('Erreur');
-                    state._baseTextBeforeDictation = '';
-                }
-            );
+            await SpeechModule.startRecognition(state.currentLang, (fullText, interimText) => {
+                const baseText = state._baseTextBeforeDictation || '';
+                state.fullTranscript = baseText + fullText;
+                let displayText = baseText + fullText;
+                if (interimText && interimText.trim() && interimText !== state._lastInterimText) { displayText += interimText; state._lastInterimText = interimText; }
+                if (DOM.output) { DOM.output.value = displayText; DOM.output.scrollTop = DOM.output.scrollHeight; }
+            }, (error) => { showToast(error); resetRecordButton(); updateModeIndicator('Erreur'); state._baseTextBeforeDictation = ''; });
             setRecordButtonRecording();
             updateModeIndicator('🔴 Enregistrement...');
-        } catch(e) {
-            showToast('Erreur: ' + (e.message || 'Microphone indisponible'));
-            resetRecordButton();
-            state._baseTextBeforeDictation = '';
-        }
+        } catch(e) { showToast('Erreur: ' + (e.message || 'Microphone indisponible')); resetRecordButton(); state._baseTextBeforeDictation = ''; }
     }
 
     async function handleTranslation() {
@@ -1650,10 +1533,7 @@
         if (!text || !text.trim()) { showToast('Aucun texte à traduire'); return; }
         const charCount = text.length;
         const translationCost = CreditModule.getServiceCost('translation', charCount);
-        if (CreditModule.currentCredits < translationCost) {
-            showToast('💰 Crédits insuffisants ! Coût : ' + translationCost + ' crédits');
-            return;
-        }
+        if (CreditModule.currentCredits < translationCost) { showToast('💰 Crédits insuffisants ! Coût : ' + translationCost + ' crédits'); return; }
         if (DOM.translateBtn) DOM.translateBtn.disabled = true;
         updateModeIndicator('🌐 Traduction...');
         try {
@@ -1664,11 +1544,8 @@
             await CreditModule.useCredits('translation', translationCost);
             updateCreditsDisplay();
             showToast('✅ Traduction terminée (' + translationCost + ' crédits)');
-        } catch (e) {
-            showToast('❌ Erreur : ' + e.message);
-        } finally {
-            if (DOM.translateBtn) DOM.translateBtn.disabled = false;
-        }
+        } catch (e) { showToast('❌ Erreur : ' + e.message); }
+        finally { if (DOM.translateBtn) DOM.translateBtn.disabled = false; }
     }
 
     function toggleSpeech() {
@@ -1678,10 +1555,7 @@
         if (!text || !text.trim()) { showToast('Aucun texte à lire'); return; }
         const charCount = text.length;
         const speechCost = CreditModule.getServiceCost('speech_reading', charCount);
-        if (CreditModule.currentCredits < speechCost) {
-            showToast('💰 Crédits insuffisants !\nCoût : ' + speechCost + ' crédits');
-            return;
-        }
+        if (CreditModule.currentCredits < speechCost) { showToast('💰 Crédits insuffisants !\nCoût : ' + speechCost + ' crédits'); return; }
         CreditModule.useCredits('speech_reading', speechCost).then(() => updateCreditsDisplay()).catch(() => {});
         SpeechModule.onStart = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Pause'; };
         SpeechModule.onPause = () => { if (DOM.playBtn) DOM.playBtn.querySelector('span:last-child').textContent = 'Reprendre'; };
@@ -1692,20 +1566,12 @@
         SpeechModule.speak(text, state.currentLang, parseFloat(state.speechRate), preferredVoice);
     }
 
-    function stopSpeech() {
-        SpeechModule.stopSpeaking();
-        resetPlayButton();
-    }
+    function stopSpeech() { SpeechModule.stopSpeaking(); resetPlayButton(); }
 
     function handleIAAbort() {
         if (state.isProcessingIA) {
-            AIModule.abort();
-            state.isProcessingIA = false;
-            if (DOM.iaBtn) {
-                DOM.iaBtn.disabled = false;
-                DOM.iaBtn.querySelector('span:last-child').textContent = 'IA';
-                DOM.iaBtn.title = 'Lancer le traitement IA';
-            }
+            AIModule.abort(); state.isProcessingIA = false;
+            if (DOM.iaBtn) { DOM.iaBtn.disabled = false; DOM.iaBtn.querySelector('span:last-child').textContent = 'IA'; DOM.iaBtn.title = 'Lancer le traitement IA'; }
             if (DOM.progressBar) DOM.progressBar.style.display = 'none';
             if (DOM.progressFill) DOM.progressFill.style.width = '0%';
             updateModeIndicator('⏹ Interrompu');
@@ -1718,26 +1584,15 @@
         if (!text || !text.trim()) { showToast('Aucun texte à traiter'); return; }
         const charCount = text.length;
         const iaCost = calculateIACost(charCount);
-        if (charCount > 20000) {
-            const confirmed = await confirmLargeProcessing(charCount, iaCost);
-            if (!confirmed) return;
-        }
-        if (CreditModule.currentCredits < iaCost) {
-            showToast('💰 Crédits insuffisants ! Coût : ' + iaCost + ' crédits');
-            return;
-        }
+        if (charCount > 20000) { const confirmed = await confirmLargeProcessing(charCount, iaCost); if (!confirmed) return; }
+        if (CreditModule.currentCredits < iaCost) { showToast('💰 Crédits insuffisants ! Coût : ' + iaCost + ' crédits'); return; }
         state.isProcessingIA = true;
         let caracteresTraites = 0;
-        if (DOM.iaBtn) {
-            DOM.iaBtn.querySelector('span:last-child').textContent = '...';
-            DOM.iaBtn.title = 'Double-clic pour interrompre';
-        }
+        if (DOM.iaBtn) { DOM.iaBtn.querySelector('span:last-child').textContent = '...'; DOM.iaBtn.title = 'Double-clic pour interrompre'; }
         if (DOM.progressBar) DOM.progressBar.style.display = 'block';
         if (DOM.progressFill) DOM.progressFill.style.width = '0%';
         updateModeIndicator('🤖 IA en cours...');
-        let traitementReussi = false;
-        let traitementInterrompu = false;
-        let apiIndisponible = false;
+        let traitementReussi = false, traitementInterrompu = false, apiIndisponible = false;
         try {
             const result = await AIModule.processText(text, state.selectedAction, (current, total, label) => {
                 const percent = Math.round((current / total) * 100);
@@ -1750,46 +1605,28 @@
                 state.fullTranscript = result;
                 updateModeIndicator('✅ Terminé');
                 if (DOM.formatInfo) DOM.formatInfo.textContent = result.length.toLocaleString() + ' caractères';
-                traitementReussi = true;
-                caracteresTraites = charCount;
-            } else {
-                throw new Error('Résultat vide');
-            }
+                traitementReussi = true; caracteresTraites = charCount;
+            } else throw new Error('Résultat vide');
         } catch (e) {
-            if (e.name === 'AbortError' || (e.message && e.message.includes('interrompu'))) {
-                traitementInterrompu = true;
-            } else if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('timeout') || e.message.includes('429') || e.message.includes('503') || e.message.includes('502'))) {
-                apiIndisponible = true;
-            } else {
-                showToast('❌ Erreur IA : ' + (e.message || 'Erreur inconnue'));
-            }
+            if (e.name === 'AbortError' || (e.message && e.message.includes('interrompu'))) traitementInterrompu = true;
+            else if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('timeout') || e.message.includes('429') || e.message.includes('503') || e.message.includes('502'))) apiIndisponible = true;
+            else showToast('❌ Erreur IA : ' + (e.message || 'Erreur inconnue'));
         } finally {
             state.isProcessingIA = false;
-            if (DOM.iaBtn) {
-                DOM.iaBtn.disabled = false;
-                DOM.iaBtn.querySelector('span:last-child').textContent = 'IA';
-                DOM.iaBtn.title = 'Lancer le traitement IA';
-            }
+            if (DOM.iaBtn) { DOM.iaBtn.disabled = false; DOM.iaBtn.querySelector('span:last-child').textContent = 'IA'; DOM.iaBtn.title = 'Lancer le traitement IA'; }
             setTimeout(() => { if (DOM.progressBar && !state.isProcessingIA) DOM.progressBar.style.display = 'none'; }, 2000);
         }
-        if (traitementReussi) {
-            await CreditModule.useCredits('ia_processing', iaCost);
-            updateCreditsDisplay();
-        } else if (traitementInterrompu && caracteresTraites > 0) {
+        if (traitementReussi) { await CreditModule.useCredits('ia_processing', iaCost); updateCreditsDisplay(); }
+        else if (traitementInterrompu && caracteresTraites > 0) {
             const creditDebites = calculatePartialCost(charCount, caracteresTraites, iaCost);
-            if (creditDebites > 0) {
-                await CreditModule.useCredits('ia_processing', creditDebites);
-                updateCreditsDisplay();
-            }
+            if (creditDebites > 0) { await CreditModule.useCredits('ia_processing', creditDebites); updateCreditsDisplay(); }
         }
     }
 
     function copyText() {
         const text = DOM.output ? DOM.output.value : '';
         if (!text || !text.trim()) { showToast('Aucun texte à copier'); return; }
-        navigator.clipboard.writeText(text).then(() => showToast('Texte copié !')).catch(() => {
-            if (DOM.output) { DOM.output.select(); document.execCommand('copy'); showToast('Texte copié !'); }
-        });
+        navigator.clipboard.writeText(text).then(() => showToast('Texte copié !')).catch(() => { if (DOM.output) { DOM.output.select(); document.execCommand('copy'); showToast('Texte copié !'); } });
     }
 
     async function handleExport() {
@@ -1799,10 +1636,7 @@
         const charCount = text.length;
         const estimatedPages = Math.max(1, Math.ceil(charCount / 2500));
         const pdfCost = CreditModule.getServiceCost('pdf_export', null, estimatedPages);
-        if (CreditModule.currentCredits < pdfCost) {
-            showToast('⚠️ TXT exporté. Crédits insuffisants pour le PDF (' + pdfCost + ' crédits).');
-            return;
-        }
+        if (CreditModule.currentCredits < pdfCost) { showToast('⚠️ TXT exporté. Crédits insuffisants pour le PDF (' + pdfCost + ' crédits).'); return; }
         setTimeout(() => {
             const pdfIconSVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28"><path d="M6 2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" stroke="#b07cc6" stroke-width="1.8" fill="none"/><path d="M14 2v6h6" stroke="#b07cc6" stroke-width="1.8" fill="none"/><path d="M9 13h6M9 16h4" stroke="#b07cc6" stroke-width="1.5" stroke-linecap="round"/></svg>`;
             const now = new Date();
@@ -1815,15 +1649,11 @@
         if (!DOM.output || !DOM.output.value.trim()) { showToast('Aucun texte à effacer'); return; }
         const trashIconSVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28"><path d="M4 6h16" stroke="#f08080" stroke-width="1.8" stroke-linecap="round"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" stroke="#f08080" stroke-width="1.8" fill="none"/><path d="M10 10v7M14 10v7" stroke="#f08080" stroke-width="1.8" stroke-linecap="round"/><path d="M5 6l1 14a1 1 0 001 1h10a1 1 0 001-1l1-14" stroke="#f08080" stroke-width="1.8" fill="none"/></svg>`;
         showConfirmPopup('Effacer le texte', 'Voulez-vous vraiment effacer tout le texte ?\nCette action est irréversible.', trashIconSVG, 'Effacer', () => {
-            state.fullTranscript = '';
-            state.translatedText = '';
-            state._lastInterimText = '';
-            DOM.output.value = '';
-            window.storage.setSession('currentText', '');
+            state.fullTranscript = ''; state.translatedText = ''; state._lastInterimText = '';
+            DOM.output.value = ''; window.storage.setSession('currentText', '');
             if (SpeechModule.isSpeaking || SpeechModule.isPaused) { SpeechModule.stopSpeaking(); resetPlayButton(); }
             if (DOM.formatInfo) DOM.formatInfo.textContent = '';
-            updateModeIndicator('Prêt');
-            showToast('Texte effacé');
+            updateModeIndicator('Prêt'); showToast('Texte effacé');
         });
     }
 
@@ -1834,17 +1664,9 @@
         updateModeIndicator('📄 Extraction PDF...');
         try {
             const text = await PDFModule.extractText(file);
-            if (text && text.trim()) {
-                if (DOM.output) DOM.output.value = text;
-                state.fullTranscript = text;
-                updateModeIndicator('✅ PDF extrait');
-                showToast('PDF extrait (' + text.length.toLocaleString() + ' car.)');
-            } else {
-                showToast('Aucun texte extractible');
-            }
-        } catch (err) {
-            showToast('Erreur PDF: ' + err.message);
-        }
+            if (text && text.trim()) { if (DOM.output) DOM.output.value = text; state.fullTranscript = text; updateModeIndicator('✅ PDF extrait'); showToast('PDF extrait (' + text.length.toLocaleString() + ' car.)'); }
+            else showToast('Aucun texte extractible');
+        } catch (err) { showToast('Erreur PDF: ' + err.message); }
         e.target.value = '';
     }
 
@@ -1855,32 +1677,15 @@
     function setupPWA() {
         window._deferredPrompt = null;
         if (window.matchMedia('(display-mode: standalone)').matches) return;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            window._deferredPrompt = e;
-            if (DOM.installBtn) DOM.installBtn.style.display = 'inline-flex';
-        });
-        window.addEventListener('appinstalled', () => {
-            window._deferredPrompt = null;
-            if (DOM.installBtn) DOM.installBtn.style.display = 'none';
-        });
+        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window._deferredPrompt = e; if (DOM.installBtn) DOM.installBtn.style.display = 'inline-flex'; });
+        window.addEventListener('appinstalled', () => { window._deferredPrompt = null; if (DOM.installBtn) DOM.installBtn.style.display = 'none'; });
         if (DOM.installBtn) {
             DOM.installBtn.addEventListener('click', async () => {
-                if (window._deferredPrompt) {
-                    window._deferredPrompt.prompt();
-                    await window._deferredPrompt.userChoice;
-                    window._deferredPrompt = null;
-                    DOM.installBtn.style.display = 'none';
-                } else {
-                    showToast('📱 Menu du navigateur → Installer');
-                }
+                if (window._deferredPrompt) { window._deferredPrompt.prompt(); await window._deferredPrompt.userChoice; window._deferredPrompt = null; DOM.installBtn.style.display = 'none'; }
+                else showToast('📱 Menu du navigateur → Installer');
             });
         }
-        setTimeout(() => {
-            if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
-                DOM.installBtn.style.display = 'inline-flex';
-            }
-        }, 2000);
+        setTimeout(() => { if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) DOM.installBtn.style.display = 'inline-flex'; }, 2000);
         if ('serviceWorker' in navigator) {
             const basePath = location.pathname.replace(/\/[^/]*$/, '');
             const swPath = basePath ? basePath + '/sw.js' : './sw.js';
@@ -1888,12 +1693,7 @@
         }
     }
 
-    function loadVoices() {
-        if ('speechSynthesis' in window) {
-            speechSynthesis.getVoices();
-            speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
-        }
-    }
+    function loadVoices() { if ('speechSynthesis' in window) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); } }
 
     // ============================================================
     // INITIALISATION
@@ -1901,19 +1701,12 @@
 
     function cacheDOM() {
         const ids = [
-            'output', 'recordBtn', 'translateBtn', 'playBtn', 'iaBtn',
-            'copyBtn', 'clearBtn', 'exportBtn', 'importPdfBtn', 'pdfFileInput',
-            'langSelect', 'speedSelect', 'actionSelect',
-            'apiKeyInput', 'apiKeyToggle',
-            'modeIndicator', 'progressBar', 'progressFill',
-            'formatInfo', 'installBtn',
-            'creditsBadge', 'creditsCount', 'rechargeBtn',
-            'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip',
-            'regName', 'regPhone', 'regRole', 'regRoleOther',
-            'voiceSelect',
+            'output', 'recordBtn', 'translateBtn', 'playBtn', 'iaBtn', 'copyBtn', 'clearBtn', 'exportBtn', 'importPdfBtn', 'pdfFileInput',
+            'langSelect', 'speedSelect', 'actionSelect', 'apiKeyInput', 'apiKeyToggle', 'modeIndicator', 'progressBar', 'progressFill',
+            'formatInfo', 'installBtn', 'creditsBadge', 'creditsCount', 'rechargeBtn',
+            'registerPopup', 'registerOverlay', 'registerSubmit', 'registerSkip', 'regName', 'regPhone', 'regRole', 'regRoleOther', 'voiceSelect',
             'adminDashboardOverlay', 'adminCloseBtn', 'filterName', 'filterPhone', 'filterBtn', 'resetFilterBtn',
-            'gestionSearchBtn', 'gestionFilterName', 'gestionTableBody',
-            'editUserPopup', 'editUserId', 'editUserName',
+            'gestionSearchBtn', 'gestionFilterName', 'gestionTableBody', 'editUserPopup', 'editUserId', 'editUserName',
             'editUserPhone', 'editUserRole', 'editUserCredits', 'cancelEditBtn', 'saveEditBtn'
         ];
         ids.forEach(id => { DOM[id] = document.getElementById(id); });
@@ -1927,12 +1720,7 @@
         if (DOM.speedSelect) DOM.speedSelect.value = state.speechRate;
         if (DOM.actionSelect) DOM.actionSelect.value = state.selectedAction;
         const apiKey = window.storage.get('api_key', '');
-        if (apiKey && DOM.apiKeyInput) {
-            DOM.apiKeyInput.value = apiKey;
-            if (DOM.apiKeyToggle) DOM.apiKeyToggle.checked = true;
-            DOM.apiKeyInput.readOnly = true;
-            DOM.apiKeyInput.type = 'password';
-        }
+        if (apiKey && DOM.apiKeyInput) { DOM.apiKeyInput.value = apiKey; if (DOM.apiKeyToggle) DOM.apiKeyToggle.checked = true; DOM.apiKeyInput.readOnly = true; DOM.apiKeyInput.type = 'password'; }
         const savedText = window.storage.getSession('currentText', '');
         if (savedText && DOM.output) { DOM.output.value = savedText; state.fullTranscript = savedText; }
         const savedVoice = window.storage.get('preferredVoice', 'auto');
@@ -1945,14 +1733,8 @@
         if (DOM.rechargeBtn) DOM.rechargeBtn.addEventListener('click', showRechargePopup);
         if (DOM.playBtn) {
             let clickTimer = null;
-            DOM.playBtn.addEventListener('click', (e) => {
-                if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; }
-                clickTimer = setTimeout(() => { clickTimer = null; toggleSpeech(); }, 250);
-            });
-            DOM.playBtn.addEventListener('dblclick', (e) => {
-                if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-                stopSpeech();
-            });
+            DOM.playBtn.addEventListener('click', (e) => { if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; } clickTimer = setTimeout(() => { clickTimer = null; toggleSpeech(); }, 250); });
+            DOM.playBtn.addEventListener('dblclick', (e) => { if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; } stopSpeech(); });
         }
         if (DOM.iaBtn) { DOM.iaBtn.addEventListener('click', handleIA); DOM.iaBtn.addEventListener('dblclick', handleIAAbort); }
         if (DOM.copyBtn) DOM.copyBtn.addEventListener('click', copyText);
@@ -1960,81 +1742,36 @@
         if (DOM.exportBtn) DOM.exportBtn.addEventListener('click', handleExport);
         if (DOM.importPdfBtn) DOM.importPdfBtn.addEventListener('click', () => { if (DOM.pdfFileInput) DOM.pdfFileInput.click(); });
         if (DOM.pdfFileInput) DOM.pdfFileInput.addEventListener('change', handlePdfImport);
-        if (DOM.langSelect) {
-            DOM.langSelect.addEventListener('change', (e) => {
-                state.currentLang = e.target.value;
-                window.storage.set('selectedLang', state.currentLang);
-                populateVoiceList(state.currentLang);
-                if (SpeechModule.isSpeaking || SpeechModule.isPaused) { SpeechModule.stopSpeaking(); resetPlayButton(); }
-            });
-        }
-        if (DOM.speedSelect) {
-            DOM.speedSelect.addEventListener('change', (e) => { state.speechRate = e.target.value; window.storage.set('speechRate', state.speechRate); });
-        }
-        if (DOM.voiceSelect) {
-            DOM.voiceSelect.addEventListener('change', (e) => { window.storage.set('preferredVoice', e.target.value); });
-        }
-        if (DOM.actionSelect) {
-            DOM.actionSelect.addEventListener('change', (e) => { state.selectedAction = e.target.value; window.storage.set('selectedAction', state.selectedAction); });
-        }
-        if (DOM.apiKeyToggle) {
-            DOM.apiKeyToggle.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    const key = DOM.apiKeyInput ? DOM.apiKeyInput.value.trim() : '';
-                    if (key) {
-                        AIModule.setApiKey(key);
-                        if (DOM.apiKeyInput) { DOM.apiKeyInput.readOnly = true; DOM.apiKeyInput.type = 'password'; }
-                        showToast('Clé API verrouillée');
-                    } else { e.target.checked = false; showToast('Veuillez entrer une clé API'); }
-                } else {
-                    if (DOM.apiKeyInput) { DOM.apiKeyInput.readOnly = false; DOM.apiKeyInput.type = 'text'; }
-                    window.storage.remove('api_key');
-                }
-            });
-        }
-        if (DOM.output) {
-            DOM.output.addEventListener('input', () => { state.fullTranscript = DOM.output.value; window.storage.setSession('currentText', DOM.output.value); });
-        }
+        if (DOM.langSelect) DOM.langSelect.addEventListener('change', (e) => { state.currentLang = e.target.value; window.storage.set('selectedLang', state.currentLang); populateVoiceList(state.currentLang); if (SpeechModule.isSpeaking || SpeechModule.isPaused) { SpeechModule.stopSpeaking(); resetPlayButton(); } });
+        if (DOM.speedSelect) DOM.speedSelect.addEventListener('change', (e) => { state.speechRate = e.target.value; window.storage.set('speechRate', state.speechRate); });
+        if (DOM.voiceSelect) DOM.voiceSelect.addEventListener('change', (e) => { window.storage.set('preferredVoice', e.target.value); });
+        if (DOM.actionSelect) DOM.actionSelect.addEventListener('change', (e) => { state.selectedAction = e.target.value; window.storage.set('selectedAction', state.selectedAction); });
+        if (DOM.apiKeyToggle) DOM.apiKeyToggle.addEventListener('change', (e) => {
+            if (e.target.checked) { const key = DOM.apiKeyInput ? DOM.apiKeyInput.value.trim() : ''; if (key) { AIModule.setApiKey(key); if (DOM.apiKeyInput) { DOM.apiKeyInput.readOnly = true; DOM.apiKeyInput.type = 'password'; } showToast('Clé API verrouillée'); } else { e.target.checked = false; showToast('Veuillez entrer une clé API'); } }
+            else { if (DOM.apiKeyInput) { DOM.apiKeyInput.readOnly = false; DOM.apiKeyInput.type = 'text'; } window.storage.remove('api_key'); }
+        });
+        if (DOM.output) DOM.output.addEventListener('input', () => { state.fullTranscript = DOM.output.value; window.storage.setSession('currentText', DOM.output.value); });
         const headerLogo = document.querySelector('.header-logo');
         if (headerLogo) { headerLogo.style.cursor = 'pointer'; headerLogo.addEventListener('click', openLogoPopup); }
         if (DOM.adminCloseBtn) DOM.adminCloseBtn.addEventListener('click', closeAdminDashboard);
         if (DOM.filterBtn) DOM.filterBtn.addEventListener('click', () => loadAdminDashboard(true));
         if (DOM.resetFilterBtn) DOM.resetFilterBtn.addEventListener('click', () => { if (DOM.filterName) DOM.filterName.value = ''; if (DOM.filterPhone) DOM.filterPhone.value = ''; loadAdminDashboard(false); });
-        window.addEventListener('beforeunload', () => {
-            if (DOM.output) window.storage.setSession('currentText', DOM.output.value);
-            window.storage.set('speechRate', state.speechRate);
-            window.storage.set('selectedLang', state.currentLang);
-            window.storage.set('selectedAction', state.selectedAction);
-        });
+        window.addEventListener('beforeunload', () => { if (DOM.output) window.storage.setSession('currentText', DOM.output.value); window.storage.set('speechRate', state.speechRate); window.storage.set('selectedLang', state.currentLang); window.storage.set('selectedAction', state.selectedAction); });
     }
 
     async function init() {
-        cacheDOM();
-        loadPreferences();
-        setupEvents();
-        setupPWA();
-        loadVoices();
-        await CreditModule.init();
-        updateCreditsDisplay();
+        cacheDOM(); loadPreferences(); setupEvents(); setupPWA(); loadVoices();
+        await CreditModule.init(); updateCreditsDisplay();
         if (!CreditModule.isProfileCompleted()) { setTimeout(() => showRegisterPopup(), 1000); }
         setTimeout(() => populateVoiceList(state.currentLang), 500);
-        if ('speechSynthesis' in window) {
-            speechSynthesis.getVoices();
-            speechSynthesis.onvoiceschanged = () => populateVoiceList(state.currentLang);
-            if (speechSynthesis.getVoices().length > 0) populateVoiceList(state.currentLang);
-        }
+        if ('speechSynthesis' in window) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => populateVoiceList(state.currentLang); if (speechSynthesis.getVoices().length > 0) populateVoiceList(state.currentLang); }
         setTimeout(() => populateVoiceList(state.currentLang), 1000);
-        const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen) loadingScreen.classList.add('hidden');
-        const app = document.getElementById('app');
-        if (app) app.style.display = 'flex';
+        const loadingScreen = document.getElementById('loadingScreen'); if (loadingScreen) loadingScreen.classList.add('hidden');
+        const app = document.getElementById('app'); if (app) app.style.display = 'flex';
         console.log('✅ QuickText Voice Pro - Prêt');
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 
 })();
