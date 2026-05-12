@@ -814,7 +814,7 @@
         <button class="popup-btn popup-btn-confirm" id="confirmRecharge" style="width: 100%; margin-top: 8px;">Recharger</button>
     </div>
 
-    <!-- Pop-up d'enregistrement utilisateur -->
+    <!-- Pop-up d'enregistrement utilisateur (obligatoire au premier lancement) -->
     <div id="registerOverlay" style="display: none;">
         <div id="registerPopup">
             <div class="register-content">
@@ -826,9 +826,14 @@
                 </div>
                 <h3 class="register-title">Bienvenue sur QuickText Pro</h3>
                 <p class="register-subtitle">Complétez vos informations pour commencer</p>
+                
                 <div class="register-fields">
                     <input type="text" class="popup-input" id="regName" placeholder="Nom complet *" autocomplete="name" maxlength="100" required>
-                    <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone (ex: 696271312)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
+                    <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone * (ex: 696271312)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
+                    <!-- ✅ Nouveau : Mot de passe -->
+                    <input type="password" class="popup-input" id="regPassword" placeholder="Mot de passe * (6 caractères min.)" autocomplete="new-password" minlength="6" maxlength="50">
+                    
+                    <!-- Menu déroulant pour le rôle -->
                     <select class="popup-input" id="regRole" style="text-align: left; text-align-last: left;">
                         <option value="" disabled selected>Choisir un rôle...</option>
                         <option value="Élève">Élève</option>
@@ -841,10 +846,12 @@
                         <option value="Chercheur">Chercheur</option>
                         <option value="Autre">Autre (préciser)</option>
                     </select>
+                    
                     <input type="text" class="popup-input" id="regRoleOther" placeholder="Précisez votre profession..." autocomplete="off" maxlength="50" style="display: none;">
                 </div>
+                
                 <button class="register-btn" id="registerSubmit">Enregistrer</button>
-                <p class="register-note">* Champ obligatoire</p>
+                <p class="register-note">* Champs obligatoires</p>
             </div>
         </div>
     </div>

@@ -237,9 +237,9 @@
                 </div>
                 <div class="popup-buttons" style="flex-direction: column; gap: 8px;">
                     <a href="https://wa.me/237620994646" target="_blank" rel="noopener" 
-                       style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; 
-                              padding: 12px; background: #25D366; color: white; border-radius: var(--radius-sm); 
-                              font-size: 0.9rem; font-weight: 600; font-family: inherit;">
+                    style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; 
+                            padding: 12px; background: #25D366; color: white; border-radius: var(--radius-sm); 
+                            font-size: 0.9rem; font-weight: 600; font-family: inherit;">
                         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                         </svg>
@@ -251,8 +251,9 @@
                     <a href="#" id="showSwitchAccountContact" style="color: var(--text-muted); text-decoration: underline;">Changer de compte</a>
                 </p>
                 <div id="switchAccountSectionContact" style="display: none; margin-top: 12px;">
-                    <input type="tel" class="popup-input" id="switchPhoneContact" placeholder="Nouveau numéro (ex: 696271312)" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
-                    <button class="popup-btn popup-btn-confirm" id="switchAccountBtnContact" style="width: 100%;">Basculer</button>
+                    <input type="tel" class="popup-input" id="switchPhoneContact" placeholder="Numéro (ex: 696271312)" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
+                    <input type="password" class="popup-input" id="switchPasswordContact" placeholder="Mot de passe" autocomplete="off">
+                    <button class="popup-btn popup-btn-confirm" id="switchAccountBtnContact" style="width: 100%;">Se connecter</button>
                 </div>
             </div>
         `;
@@ -265,21 +266,22 @@
         
         overlay.querySelector('#closeContactPopup').addEventListener('click', closeContact);
         
-        // Changer de compte
         overlay.querySelector('#showSwitchAccountContact').addEventListener('click', (e) => {
             e.preventDefault();
-            const section = overlay.querySelector('#switchAccountSectionContact');
-            section.style.display = 'block';
+            overlay.querySelector('#switchAccountSectionContact').style.display = 'block';
             setTimeout(() => overlay.querySelector('#switchPhoneContact')?.focus(), 100);
         });
         
         overlay.querySelector('#switchAccountBtnContact').addEventListener('click', async () => {
             const phone = overlay.querySelector('#switchPhoneContact').value.trim();
-            if (!/^[67]\d{8}$/.test(phone)) {
-                showToast('📱 Numéro invalide. Format : 696271312.');
+            const password = overlay.querySelector('#switchPasswordContact').value.trim();
+            
+            if (!phone || !password) {
+                showToast('⚠️ Veuillez remplir tous les champs.');
                 return;
             }
-            await switchToAccount(phone, overlay);
+            
+            await switchToAccount(phone, password, overlay);
         });
     }
 
@@ -402,11 +404,10 @@
     }
 
     // ✅ Fonction générique pour basculer vers un autre compte
-    async function switchToAccount(phone, currentOverlay) {
+    async function switchToAccount(phone, password, currentOverlay) {
         try {
-            // Rechercher le compte
             const response = await fetch(
-                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/auth-user',
                 {
                     method: 'POST',
                     headers: {
@@ -415,25 +416,31 @@
                         'apikey': CreditModule.config.anonKey,
                     },
                     body: JSON.stringify({
-                        action: 'lookup',
+                        action: 'link',
                         phone: phone,
+                        password: password,
+                        userId: CreditModule.userID,
                     }),
                 }
             );
             
             const result = await response.json();
             
-            if (result.success && result.found) {
-                // Fermer le popup actuel
+            if (result.success) {
+                window.storage.set('userID', result.userId);
+                CreditModule.userID = result.userId;
+                CreditModule.currentCredits = result.credits;
+                window.storage.set('credits', result.credits);
+                window.storage.set('profile_completed', true);
+                
                 if (currentOverlay && currentOverlay.parentNode) {
                     currentOverlay.remove();
                 }
-                // Afficher le popup "Compte existant trouvé" pour basculer
-                const user = result.user;
-                const fakeOverlay = document.getElementById('registerOverlay');
-                showAccountFoundPopup(user, phone, fakeOverlay);
+                
+                updateCreditsDisplay();
+                showToast('✅ Connecté ! ' + result.credits + ' crédits disponibles.');
             } else {
-                showToast('❌ Aucun compte trouvé avec ce numéro.');
+                showToast('❌ ' + (result.error || 'Erreur de connexion'));
             }
         } catch (e) {
             showToast('Erreur réseau : ' + e.message);
@@ -843,8 +850,7 @@
         overlay.style.display = 'flex';
         
         setTimeout(() => {
-            const phoneInput = document.getElementById('regPhone');
-            if (phoneInput) phoneInput.focus();
+            document.getElementById('regPhone')?.focus();
         }, 400);
         
         const roleSelect = document.getElementById('regRole');
@@ -876,8 +882,9 @@
                 
                 const phone = document.getElementById('regPhone')?.value.trim();
                 const name = document.getElementById('regName')?.value.trim();
+                const password = document.getElementById('regPassword')?.value.trim();
                 
-                // ✅ Téléphone obligatoire
+                // ✅ Validation
                 if (!phone) {
                     showToast('⚠️ Le numéro de téléphone est obligatoire.');
                     document.getElementById('regPhone')?.focus();
@@ -890,8 +897,14 @@
                     return;
                 }
                 
+                if (!password || password.length < 6) {
+                    showToast('🔒 Mot de passe obligatoire (6 caractères minimum).');
+                    document.getElementById('regPassword')?.focus();
+                    return;
+                }
+                
                 if (!name) {
-                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
+                    showToast('⚠️ Veuillez entrer votre nom complet.');
                     document.getElementById('regName')?.focus();
                     return;
                 }
@@ -913,12 +926,11 @@
                 }
                 
                 newBtn.disabled = true;
-                newBtn.textContent = '⏳ Recherche...';
+                newBtn.textContent = '⏳ Création...';
                 
-                // Vérifier si le numéro existe déjà
                 try {
                     const response = await fetch(
-                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/auth-user',
                         {
                             method: 'POST',
                             headers: {
@@ -927,37 +939,32 @@
                                 'apikey': CreditModule.config.anonKey,
                             },
                             body: JSON.stringify({
-                                action: 'lookup',
+                                action: 'register',
                                 phone: phone,
+                                password: password,
+                                userName: name,
+                                userRole: role,
+                                userId: CreditModule.userID,
                             }),
                         }
                     );
                     
                     const result = await response.json();
                     
-                    if (result.success && result.found) {
-                        // ✅ Numéro déjà utilisé → proposer connexion
+                    if (result.success) {
+                        CreditModule.currentCredits = 100;
+                        window.storage.set('credits', 100);
+                        window.storage.set('profile_completed', true);
                         overlay.style.display = 'none';
+                        updateCreditsDisplay();
+                        showToast('✅ Bienvenue ' + name + ' !');
+                    } else {
+                        showToast('❌ ' + (result.error || 'Erreur'));
                         newBtn.disabled = false;
                         newBtn.textContent = 'Enregistrer';
-                        showAccountFoundPopup(result.user, phone, overlay);
-                        return;
-                    }
-                    
-                    // ✅ Numéro libre → Créer le compte
-                    newBtn.textContent = '⏳ Création...';
-                    
-                    await CreditModule.createUserAfterRegistration(name, phone, role);
-                    showToast('✅ Bienvenue ' + name + ' !');
-                    overlay.style.display = 'none';
-                    updateCreditsDisplay();
-                    
-                    if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
-                        setTimeout(() => { DOM.installBtn.style.display = 'inline-flex'; }, 500);
                     }
                 } catch (e) {
-                    console.error('Erreur création :', e);
-                    showToast('❌ Erreur : ' + e.message);
+                    showToast('Erreur réseau : ' + e.message);
                     newBtn.disabled = false;
                     newBtn.textContent = 'Enregistrer';
                 }
