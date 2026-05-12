@@ -1,5 +1,6 @@
 // QuickText Voice Pro - Application Principale
 // Version finale - Export PDF+TXT avec titre personnalisable
+// Avec OTP MeSomb
 
 (function() {
     'use strict';
@@ -797,7 +798,6 @@
             const newBtn = submitBtn.cloneNode(true);
             submitBtn.parentNode.replaceChild(newBtn, submitBtn);
             
-            // Variable pour suivre si la recherche a déjà été faite
             let lookupDone = false;
             
             newBtn.addEventListener('click', async function handler(e) {
@@ -806,21 +806,18 @@
                 const phone = document.getElementById('regPhone')?.value.trim();
                 const name = document.getElementById('regName')?.value.trim();
                 
-                // Validation du nom
                 if (!name) {
                     showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
                     document.getElementById('regName')?.focus();
                     return;
                 }
                 
-                // Validation du téléphone si renseigné
                 if (phone && !/^[67]\d{8}$/.test(phone)) {
                     showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
                     document.getElementById('regPhone')?.focus();
                     return;
                 }
                 
-                // Récupérer le rôle
                 let role = document.getElementById('regRole')?.value;
                 if (role === 'Autre') {
                     role = document.getElementById('regRoleOther')?.value.trim();
@@ -840,7 +837,7 @@
                 newBtn.disabled = true;
                 newBtn.textContent = '⏳ Recherche...';
                 
-                // Étape 1 : Rechercher si le compte existe déjà
+                // Étape 1 : Rechercher si le compte existe
                 if (phone && !lookupDone) {
                     try {
                         const response = await fetch(
@@ -863,7 +860,6 @@
                         lookupDone = true;
                         
                         if (result.success && result.found) {
-                            // Compte trouvé → proposer la reconnexion
                             newBtn.disabled = false;
                             newBtn.textContent = 'Enregistrer';
                             showAccountFoundPopup(result.user, phone, name, role, cleanup);
@@ -909,7 +905,10 @@
         }, { once: false });
     }
 
-    // Fonction mise à jour pour le popup compte existant
+    // ============================================================
+    // POPUP COMPTE EXISTANT TROUVÉ
+    // ============================================================
+
     function showAccountFoundPopup(user, phone, name, role, cleanupFn) {
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
@@ -927,7 +926,7 @@
                 </div>
                 <div class="popup-title">Compte existant trouvé</div>
                 <div class="popup-message">
-                    Un compte est déjà associé au numéro <strong>${phone}</strong>.<br><br>
+                    Un compte est associé au numéro <strong>${phone}</strong>.<br><br>
                     <strong>${escapeHTML(user.user_name || 'Utilisateur')}</strong><br>
                     💰 <strong>${user.credits} crédits</strong> disponibles<br><br>
                     Voulez-vous vous connecter à ce compte ?
@@ -947,13 +946,11 @@
         
         overlay.querySelector('#cancelLinkAccount').addEventListener('click', async () => {
             closeLinkPopup();
-            // Créer un nouveau compte avec les informations saisies
             const submitBtn = document.getElementById('registerSubmit');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.textContent = '⏳ Création...';
             }
-            
             try {
                 await CreditModule.createUserAfterRegistration(name, phone, role);
                 showToast('✅ Bienvenue ' + name + ' !');
@@ -971,11 +968,11 @@
         overlay.querySelector('#confirmLinkAccount').addEventListener('click', async () => {
             const confirmBtn = overlay.querySelector('#confirmLinkAccount');
             confirmBtn.disabled = true;
-            confirmBtn.textContent = '⏳ Connexion...';
+            confirmBtn.textContent = '⏳ Envoi OTP...';
             
             try {
-                const response = await fetch(
-                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                const otpResponse = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/send-otp',
                     {
                         method: 'POST',
                         headers: {
@@ -984,37 +981,24 @@
                             'apikey': CreditModule.config.anonKey,
                         },
                         body: JSON.stringify({
-                            action: 'link',
+                            action: 'send',
                             phone: phone,
-                            newUserId: CreditModule.userID,
                         }),
                     }
                 );
                 
-                const result = await response.json();
+                const otpResult = await otpResponse.json();
                 
-                if (result.success) {
-                    window.storage.set('userID', result.userId);
-                    CreditModule.userID = result.userId;
-                    CreditModule.currentCredits = result.credits;
-                    window.storage.set('credits', result.credits);
-                    window.storage.set('profile_completed', true);
-                    
+                if (otpResult.success) {
                     closeLinkPopup();
-                    
-                    const registerOverlay = document.getElementById('registerOverlay');
-                    if (registerOverlay) {
-                        registerOverlay.style.display = 'none';
-                    }
-                    
-                    updateCreditsDisplay();
-                    showToast('✅ Connecté ! ' + result.credits + ' crédits disponibles.');
+                    showOTPVerificationPopup(phone, otpResult.otp || null, user, cleanupFn);
                 } else {
-                    showToast('❌ ' + (result.error || 'Erreur de connexion'));
+                    showToast('❌ Erreur envoi OTP : ' + (otpResult.error || 'Réessayez'));
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Se connecter';
                 }
             } catch (e) {
                 showToast('Erreur réseau : ' + e.message);
-            } finally {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = 'Se connecter';
             }
@@ -1025,56 +1009,76 @@
         });
     }
 
-    // ✅ Nouvelle fonction : popup compte existant trouvé
-    function showAccountFoundPopup(user, phone) {
+    // ============================================================
+    // POPUP VÉRIFICATION OTP
+    // ============================================================
+
+    function showOTPVerificationPopup(phone, expectedOTP, user, cleanupFn) {
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
-        overlay.style.zIndex = '35000';
+        overlay.style.zIndex = '36000';
         
         overlay.innerHTML = `
             <div class="popup-dialog">
                 <div class="popup-icon">
                     <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
-                        <circle cx="12" cy="8" r="4" stroke="#b07cc6" stroke-width="1.8"/>
-                        <path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round"/>
+                        <rect x="3" y="11" width="18" height="11" rx="2" stroke="#b07cc6" stroke-width="1.8"/>
+                        <path d="M7 11V7a5 5 0 0110 0v4" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round"/>
+                        <circle cx="12" cy="16" r="1" fill="#b07cc6"/>
                     </svg>
                 </div>
-                <div class="popup-title">Compte existant trouvé</div>
+                <div class="popup-title">Vérification OTP</div>
                 <div class="popup-message">
-                    Un compte est déjà associé au numéro <strong>${phone}</strong>.<br><br>
-                    <strong>${escapeHTML(user.user_name || 'Utilisateur')}</strong><br>
-                    💰 <strong>${user.credits} crédits</strong> disponibles<br><br>
-                    Voulez-vous vous connecter à ce compte ?
+                    Un code à 6 chiffres a été envoyé au <strong>${phone}</strong>.
+                    ${expectedOTP ? `<br><br><small style="color: var(--text-muted);">Code de test : <strong>${expectedOTP}</strong></small>` : ''}
                 </div>
+                <input type="text" class="popup-input" id="otpInput" placeholder="Entrez le code OTP" 
+                       autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                       style="font-size: 1.5rem; letter-spacing: 8px; text-align: center;">
                 <div class="popup-buttons">
-                    <button class="popup-btn popup-btn-cancel" id="cancelLinkAccount">Nouveau compte</button>
-                    <button class="popup-btn popup-btn-confirm" id="confirmLinkAccount">Se connecter</button>
+                    <button class="popup-btn popup-btn-cancel" id="cancelOTP">Annuler</button>
+                    <button class="popup-btn popup-btn-confirm" id="verifyOTP">Vérifier</button>
                 </div>
+                <p style="margin-top: 12px; font-size: 0.7rem; color: var(--text-muted);">
+                    <a href="#" id="resendOTP" style="color: var(--accent-light);">Renvoyer le code</a>
+                </p>
             </div>
         `;
         
         document.body.appendChild(overlay);
         
-        function closeLinkPopup() {
+        const otpInput = overlay.querySelector('#otpInput');
+        const verifyBtn = overlay.querySelector('#verifyOTP');
+        const cancelBtn = overlay.querySelector('#cancelOTP');
+        const resendLink = overlay.querySelector('#resendOTP');
+        let currentOTP = expectedOTP;
+        
+        function closeOTPPopup() {
             if (overlay.parentNode) overlay.remove();
         }
         
-        overlay.querySelector('#cancelLinkAccount').addEventListener('click', () => {
-            closeLinkPopup();
-            // L'utilisateur continue l'inscription normale
-            document.getElementById('regName')?.focus();
-        });
+        cancelBtn.addEventListener('click', closeOTPPopup);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOTPPopup(); });
         
-        overlay.querySelector('#confirmLinkAccount').addEventListener('click', async () => {
-            const confirmBtn = overlay.querySelector('#confirmLinkAccount');
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = '⏳ Connexion...';
+        setTimeout(() => { if (otpInput) otpInput.focus(); }, 300);
+        
+        verifyBtn.addEventListener('click', async () => {
+            const enteredOTP = otpInput.value.trim();
+            
+            if (!enteredOTP || enteredOTP.length !== 6) {
+                showToast('⚠️ Veuillez entrer le code à 6 chiffres.');
+                otpInput.focus();
+                return;
+            }
+            
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = '⏳ Vérification...';
             
             try {
                 const response = await fetch(
-                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/send-otp',
                     {
                         method: 'POST',
                         headers: {
@@ -1083,9 +1087,9 @@
                             'apikey': CreditModule.config.anonKey,
                         },
                         body: JSON.stringify({
-                            action: 'link',
+                            action: 'verify',
                             phone: phone,
-                            newUserId: CreditModule.userID,
+                            otp: enteredOTP,
                         }),
                     }
                 );
@@ -1093,36 +1097,93 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Mettre à jour l'ID utilisateur localement
-                    window.storage.set('userID', result.userId);
-                    CreditModule.userID = result.userId;
-                    CreditModule.currentCredits = result.credits;
-                    window.storage.set('credits', result.credits);
-                    window.storage.set('profile_completed', true);
+                    closeOTPPopup();
                     
-                    closeLinkPopup();
+                    const linkResponse = await fetch(
+                        'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                                'apikey': CreditModule.config.anonKey,
+                            },
+                            body: JSON.stringify({
+                                action: 'link',
+                                phone: phone,
+                                newUserId: CreditModule.userID,
+                            }),
+                        }
+                    );
                     
-                    // Fermer le popup d'enregistrement
-                    const registerOverlay = document.getElementById('registerOverlay');
-                    if (registerOverlay) {
-                        registerOverlay.style.display = 'none';
+                    const linkResult = await linkResponse.json();
+                    
+                    if (linkResult.success) {
+                        window.storage.set('userID', linkResult.userId);
+                        CreditModule.userID = linkResult.userId;
+                        CreditModule.currentCredits = linkResult.credits;
+                        window.storage.set('credits', linkResult.credits);
+                        window.storage.set('profile_completed', true);
+                        
+                        const registerOverlay = document.getElementById('registerOverlay');
+                        if (registerOverlay) {
+                            registerOverlay.style.display = 'none';
+                        }
+                        
+                        updateCreditsDisplay();
+                        showToast('✅ Connecté ! ' + linkResult.credits + ' crédits disponibles.');
+                    } else {
+                        showToast('❌ Erreur liaison compte');
                     }
-                    
-                    updateCreditsDisplay();
-                    showToast('✅ Connecté ! ' + result.credits + ' crédits disponibles.');
                 } else {
-                    showToast('❌ ' + (result.error || 'Erreur de connexion'));
+                    showToast('❌ Code incorrect. Veuillez réessayer.');
+                    otpInput.value = '';
+                    otpInput.focus();
                 }
             } catch (e) {
                 showToast('Erreur réseau : ' + e.message);
             } finally {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = 'Se connecter';
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = 'Vérifier';
             }
         });
         
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) closeLinkPopup();
+        otpInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                verifyBtn.click();
+            }
+        });
+        
+        resendLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            resendLink.textContent = '⏳ Envoi...';
+            
+            const otpResponse = await fetch(
+                'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/send-otp',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                        'apikey': CreditModule.config.anonKey,
+                    },
+                    body: JSON.stringify({
+                        action: 'send',
+                        phone: phone,
+                    }),
+                }
+            );
+            
+            const otpResult = await otpResponse.json();
+            
+            if (otpResult.success) {
+                currentOTP = otpResult.otp || null;
+                showToast('📱 Nouveau code envoyé');
+                otpInput.value = '';
+                otpInput.focus();
+            }
+            resendLink.textContent = 'Renvoyer le code';
         });
     }
 
