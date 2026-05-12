@@ -412,57 +412,123 @@
 
     function showRegisterPopup() {
         if (CreditModule.isProfileCompleted()) return;
+        
         const overlay = document.getElementById('registerOverlay');
         if (!overlay) return;
+        
         overlay.style.display = 'flex';
+        
         setTimeout(() => {
             const nameInput = document.getElementById('regName');
             if (nameInput) nameInput.focus();
         }, 400);
+        
         function cleanup() {
             overlay.style.display = 'none';
             setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 300);
         }
+        
+        // Gérer l'affichage du champ "Autre"
+        const roleSelect = document.getElementById('regRole');
+        const roleOtherInput = document.getElementById('regRoleOther');
+        
+        if (roleSelect && roleOtherInput) {
+            // Réinitialiser
+            roleSelect.value = '';
+            roleOtherInput.style.display = 'none';
+            roleOtherInput.value = '';
+            
+            roleSelect.addEventListener('change', () => {
+                if (roleSelect.value === 'Autre') {
+                    roleOtherInput.style.display = 'block';
+                    setTimeout(() => roleOtherInput.focus(), 100);
+                } else {
+                    roleOtherInput.style.display = 'none';
+                    roleOtherInput.value = '';
+                }
+            });
+        }
+        
         const submitBtn = document.getElementById('registerSubmit');
         if (submitBtn) {
-            submitBtn.addEventListener('click', async function handler(e) {
+            // Supprimer les anciens listeners en clonant
+            const newBtn = submitBtn.cloneNode(true);
+            submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+            
+            newBtn.addEventListener('click', async function handler(e) {
                 e.preventDefault();
+                
                 const name = document.getElementById('regName')?.value.trim();
                 const phone = document.getElementById('regPhone')?.value.trim();
-                const role = document.getElementById('regRole')?.value.trim();
+                
+                // Récupérer le rôle (menu déroulant ou champ "Autre")
+                let role = document.getElementById('regRole')?.value;
+                if (role === 'Autre') {
+                    role = document.getElementById('regRoleOther')?.value.trim();
+                    if (!role) {
+                        showToast('⚠️ Veuillez préciser votre profession.');
+                        document.getElementById('regRoleOther')?.focus();
+                        return;
+                    }
+                }
+                
+                // Validation du nom
                 if (!name) {
-                    showToast('⚠️ Veuillez entrer votre nom complet.');
+                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
                     document.getElementById('regName')?.focus();
                     return;
                 }
+                
+                // Validation du téléphone si renseigné
                 if (phone && !/^[67]\d{8}$/.test(phone)) {
-                    showToast('📱 Numéro invalide. Format : 696271312.');
+                    showToast('📱 Numéro invalide. Format : 696271312 (9 chiffres).');
                     document.getElementById('regPhone')?.focus();
                     return;
                 }
-                submitBtn.disabled = true;
-                submitBtn.textContent = '⏳ Enregistrement...';
+                
+                // Validation du rôle
+                if (!role) {
+                    showToast('⚠️ Veuillez sélectionner votre rôle.');
+                    document.getElementById('regRole')?.focus();
+                    return;
+                }
+                
+                newBtn.disabled = true;
+                newBtn.textContent = '⏳ Enregistrement...';
+                
                 try {
-                    await CreditModule.updateProfile(name, phone, role || 'Utilisateur');
+                    await CreditModule.updateProfile(name, phone, role);
                     showToast('✅ Bienvenue ' + name + ' !');
                     cleanup();
                     updateCreditsDisplay();
+                    
+                    // Afficher le bouton installer après enregistrement
                     if (DOM.installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
                         setTimeout(() => { DOM.installBtn.style.display = 'inline-flex'; }, 500);
                     }
                 } catch (e) {
                     console.error('Erreur enregistrement :', e);
                     showToast('❌ Erreur : ' + e.message);
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Enregistrer';
+                    newBtn.disabled = false;
+                    newBtn.textContent = 'Enregistrer';
                 }
             });
         }
+        
+        // Bloquer la fermeture
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                showToast('⚠️ Veuillez compléter votre inscription.');
+                showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
             }
         });
+        
+        // Bloquer la touche Échap
+        document.addEventListener('keydown', function blockEsc(e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
+            }
+        }, { once: false });
     }
 
     // ============================================================
@@ -515,7 +581,7 @@
                 const amountStr = amountInput?.value.trim();
 
                 if (!/^[67]\d{8}$/.test(phone)) {
-                    showToast('📱 Numéro invalide. Exemple : 696271312');
+                    showToast('📱 Numéro invalide. Exemple : 69xxxxxxx');
                     phoneInput?.focus();
                     return;
                 }

@@ -1673,6 +1673,47 @@
             }
         }
 
+        .register-fields select.popup-input {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.85rem;
+            font-family: inherit;
+            letter-spacing: 0.2px;
+            text-align: left;
+            transition: border-color 0.2s;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%239b59b6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            cursor: pointer;
+        }
+
+        .register-fields select.popup-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.15);
+        }
+
+        .register-fields select.popup-input option {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        #regRoleOther {
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
     </style>
 </head>
 <body>
@@ -1900,7 +1941,7 @@
         <div class="recharge-fields-row">
             <div class="recharge-field">
                 <label for="phoneNumber" class="recharge-label">Téléphone</label>
-                <input type="tel" class="popup-input" id="phoneNumber" placeholder="ex: 696271312" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
+                <input type="tel" class="popup-input" id="phoneNumber" placeholder="ex: 69xxxxxxx" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
             </div>
             <div class="recharge-field">
                 <label for="amountInput" class="recharge-label">Montant (XAF)</label>
@@ -1926,8 +1967,24 @@
                 
                 <div class="register-fields">
                     <input type="text" class="popup-input" id="regName" placeholder="Nom complet *" autocomplete="name" maxlength="100" required>
-                    <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone (ex: 696271312)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
-                    <input type="text" class="popup-input" id="regRole" placeholder="Rôle (ex: Étudiant, Enseignant, ...)" autocomplete="off" maxlength="50">
+                    <input type="tel" class="popup-input" id="regPhone" placeholder="Téléphone (ex: 69xxxxxxx)" autocomplete="tel" maxlength="9" inputmode="numeric" pattern="[0-9]*">
+                    
+                    <!-- Menu déroulant pour le rôle -->
+                    <select class="popup-input" id="regRole" style="text-align: left; text-align-last: left;">
+                        <option value="" disabled selected>Choisir un rôle...</option>
+                        <option value="Élève">Élève</option>
+                        <option value="Étudiant(e)">Étudiant(e)</option>
+                        <option value="Enseignant(e)">Enseignant(e)</option>
+                        <option value="Écrivain">Écrivain</option>
+                        <option value="Journaliste">Journaliste</option>
+                        <option value="Avocat">Avocat</option>
+                        <option value="Secrétaire">Secrétaire</option>
+                        <option value="Chercheur">Chercheur</option>
+                        <option value="Autre">Autre (préciser)</option>
+                    </select>
+                    
+                    <!-- Champ saisie pour "Autre" (caché par défaut) -->
+                    <input type="text" class="popup-input" id="regRoleOther" placeholder="Précisez votre profession..." autocomplete="off" maxlength="50" style="display: none;">
                 </div>
                 
                 <button class="register-btn" id="registerSubmit">Enregistrer</button>

@@ -574,7 +574,7 @@ const SpeechModule = (function() {
 
         const utterance = new SpeechSynthesisUtterance(segment);
         utterance.lang = state.currentLang;
-        utterance.rate = Math.min(state.currentRate, 0.95);
+        utterance.rate = Math.min(Math.max(state.currentRate, 0.1), 10);
         utterance.pitch = 0.9;
         utterance.volume = 1.0;
         const voice = getBestVoice(state.currentLang, state.preferredVoice);
