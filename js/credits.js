@@ -15,6 +15,7 @@ const CreditModule = {
     _pricingLastFetch: 0,
     _creditsCache: null,
     _creditsLastFetch: 0,
+    _skipAutoCreate: false,
 
     // ============================================================
     // REQUÊTE HTTP
@@ -137,19 +138,33 @@ const CreditModule = {
     // ============================================================
     // INITIALISATION
     // ============================================================
+
     async init() {
         this.userID = window.storage.get('userID', null);
+        
         if (!this.userID) {
+            // Générer un ID temporaire (non sauvegardé en base)
             this.userID = 'QT-' + Math.random().toString(36).substring(2, 8).toUpperCase();
             window.storage.set('userID', this.userID);
         }
 
-        await this.ensureUser();
-        await this.loadPricing();
-        this.initialized = true;
-        console.log('💰 Crédits initialisés - ' + this.currentCredits + ' crédits');
+        // Vérifier si le profil est complété
+        if (this.isProfileCompleted()) {
+            // Profil existant → charger normalement
+            await this.ensureUser();
+            await this.loadPricing();
+            this.initialized = true;
+        } else {
+            // Profil non complété → ne pas créer en base, utiliser des crédits locaux
+            this.currentCredits = this.config.freeCredits;
+            this.initialized = true;
+            console.log('💰 Crédits temporaires - ' + this.currentCredits + ' crédits');
+        }
+        
+        console.log('💰 Module crédits initialisé');
     },
 
+    // Modifier ensureUser pour accepter le mode différé
     async ensureUser() {
         const user = await this.fetchUser();
         if (user) {
@@ -168,6 +183,53 @@ const CreditModule = {
                 throw e;
             }
         }
+    },
+
+    // Ajouter une fonction pour créer l'utilisateur après inscription
+    async createUserAfterRegistration(userName, userTel, userRole) {
+        // Supprimer l'utilisateur temporaire s'il existe
+        const filter = 'user_id=eq.' + encodeURIComponent(this.userID);
+        const existing = await this.supabaseQuery('/rest/v1/users?select=id&' + filter);
+        
+        if (existing && existing.length > 0) {
+            // Mettre à jour l'utilisateur existant
+            await this.supabaseQuery('/rest/v1/users?id=eq.' + existing[0].id, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    user_name: userName,
+                    user_tel: userTel,
+                    user_role: userRole,
+                    credits: this.config.freeCredits,
+                    created_at: new Date().toISOString(),
+                    last_used: new Date().toISOString(),
+                })
+            });
+        } else {
+            // Créer un nouvel utilisateur
+            await this.insertUserWithProfile(userName, userTel, userRole);
+        }
+        
+        this.currentCredits = this.config.freeCredits;
+        window.storage.set('credits', this.currentCredits);
+        window.storage.set('profile_completed', true);
+        
+        console.log('✅ Utilisateur créé après inscription');
+        return true;
+    },
+
+    async insertUserWithProfile(userName, userTel, userRole) {
+        return await this.supabaseQuery('/rest/v1/users', {
+            method: 'POST',
+            body: JSON.stringify({
+                user_id: this.userID,
+                user_name: userName,
+                user_tel: userTel,
+                user_role: userRole,
+                credits: this.config.freeCredits,
+                created_at: new Date().toISOString(),
+                last_used: new Date().toISOString(),
+            })
+        });
     },
 
     async fetchUser() {
