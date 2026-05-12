@@ -764,8 +764,8 @@
         overlay.style.display = 'flex';
         
         setTimeout(() => {
-            const nameInput = document.getElementById('regName');
-            if (nameInput) nameInput.focus();
+            const phoneInput = document.getElementById('regPhone');
+            if (phoneInput) phoneInput.focus();
         }, 400);
         
         function cleanup() {
@@ -800,8 +800,47 @@
             newBtn.addEventListener('click', async function handler(e) {
                 e.preventDefault();
                 
-                const name = document.getElementById('regName')?.value.trim();
                 const phone = document.getElementById('regPhone')?.value.trim();
+                
+                // ✅ Étape 1 : Vérifier si le numéro existe déjà
+                if (phone && /^[67]\d{8}$/.test(phone)) {
+                    newBtn.disabled = true;
+                    newBtn.textContent = '⏳ Recherche...';
+                    
+                    try {
+                        const response = await fetch(
+                            'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                                    'apikey': CreditModule.config.anonKey,
+                                },
+                                body: JSON.stringify({
+                                    action: 'lookup',
+                                    phone: phone,
+                                }),
+                            }
+                        );
+                        
+                        const result = await response.json();
+                        
+                        if (result.success && result.found) {
+                            // ✅ Compte trouvé → proposer la reconnexion
+                            showAccountFoundPopup(result.user, phone);
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('Erreur recherche compte :', e);
+                    } finally {
+                        newBtn.disabled = false;
+                        newBtn.textContent = 'Enregistrer';
+                    }
+                }
+                
+                // ✅ Étape 2 : Sinon, inscription normale
+                const name = document.getElementById('regName')?.value.trim();
                 
                 let role = document.getElementById('regRole')?.value;
                 if (role === 'Autre') {
@@ -814,7 +853,7 @@
                 }
                 
                 if (!name) {
-                    showToast('⚠️ Veuillez entrer votre nom complet (obligatoire).');
+                    showToast('⚠️ Veuillez entrer votre nom complet.');
                     document.getElementById('regName')?.focus();
                     return;
                 }
@@ -864,6 +903,107 @@
                 showToast('⚠️ Veuillez compléter votre inscription pour continuer.');
             }
         }, { once: false });
+    }
+
+    // ✅ Nouvelle fonction : popup compte existant trouvé
+    function showAccountFoundPopup(user, phone) {
+        const overlay = document.createElement('div');
+        overlay.className = 'popup-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.style.zIndex = '35000';
+        
+        overlay.innerHTML = `
+            <div class="popup-dialog">
+                <div class="popup-icon">
+                    <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+                        <circle cx="12" cy="8" r="4" stroke="#b07cc6" stroke-width="1.8"/>
+                        <path d="M4 20c0-4 4-7 8-7s8 3 8 7" stroke="#b07cc6" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="popup-title">Compte existant trouvé</div>
+                <div class="popup-message">
+                    Un compte est déjà associé au numéro <strong>${phone}</strong>.<br><br>
+                    <strong>${escapeHTML(user.user_name || 'Utilisateur')}</strong><br>
+                    💰 <strong>${user.credits} crédits</strong> disponibles<br><br>
+                    Voulez-vous vous connecter à ce compte ?
+                </div>
+                <div class="popup-buttons">
+                    <button class="popup-btn popup-btn-cancel" id="cancelLinkAccount">Nouveau compte</button>
+                    <button class="popup-btn popup-btn-confirm" id="confirmLinkAccount">Se connecter</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        function closeLinkPopup() {
+            if (overlay.parentNode) overlay.remove();
+        }
+        
+        overlay.querySelector('#cancelLinkAccount').addEventListener('click', () => {
+            closeLinkPopup();
+            // L'utilisateur continue l'inscription normale
+            document.getElementById('regName')?.focus();
+        });
+        
+        overlay.querySelector('#confirmLinkAccount').addEventListener('click', async () => {
+            const confirmBtn = overlay.querySelector('#confirmLinkAccount');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '⏳ Connexion...';
+            
+            try {
+                const response = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/link-account',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey,
+                        },
+                        body: JSON.stringify({
+                            action: 'link',
+                            phone: phone,
+                            newUserId: CreditModule.userID,
+                        }),
+                    }
+                );
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Mettre à jour l'ID utilisateur localement
+                    window.storage.set('userID', result.userId);
+                    CreditModule.userID = result.userId;
+                    CreditModule.currentCredits = result.credits;
+                    window.storage.set('credits', result.credits);
+                    window.storage.set('profile_completed', true);
+                    
+                    closeLinkPopup();
+                    
+                    // Fermer le popup d'enregistrement
+                    const registerOverlay = document.getElementById('registerOverlay');
+                    if (registerOverlay) {
+                        registerOverlay.style.display = 'none';
+                    }
+                    
+                    updateCreditsDisplay();
+                    showToast('✅ Connecté ! ' + result.credits + ' crédits disponibles.');
+                } else {
+                    showToast('❌ ' + (result.error || 'Erreur de connexion'));
+                }
+            } catch (e) {
+                showToast('Erreur réseau : ' + e.message);
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Se connecter';
+            }
+        });
+        
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeLinkPopup();
+        });
     }
 
     // ============================================================
