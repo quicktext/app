@@ -1,6 +1,6 @@
 // QuickText Voice Pro - Application Principale
 // Version finale - Export PDF+TXT avec titre personnalisable
-// Avec OTP MeSomb
+// Avec OTP MeSomb - Toasts en haut
 
 (function() {
     'use strict';
@@ -46,7 +46,7 @@
         if (!toast || !toast.parentNode) return;
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.3s ease';
-        toast.style.transform = 'translateX(-50%) translateY(10px)';
+        toast.style.transform = 'translateX(-50%) translateY(-10px)';
         setTimeout(() => { if (toast.parentNode) toast.remove(); }, 300);
     }
 
@@ -486,7 +486,7 @@
                     <tr>
                         <td>${escapeHTML(u.user_name || 'N/A')}</td>
                         <td>${escapeHTML(u.user_tel || 'N/A')}</td>
-                        <td><span>${escapeHTML(u.user_role || 'user')}</span></td>
+                        <td>${escapeHTML(u.user_role || 'user')}</td>
                         <td>${u.credits}</td>
                         <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
                     </tr>
@@ -505,13 +505,9 @@
             });
         }
         
-        const statTotalServices = document.getElementById('statTotalServices');
-        const statTotalCreditsMoved = document.getElementById('statTotalCreditsMoved');
-        const statTotalRevenue = document.getElementById('statTotalRevenue');
-        
-        if (statTotalServices) statTotalServices.textContent = totalServices;
-        if (statTotalCreditsMoved) statTotalCreditsMoved.textContent = totalCreditsMoved;
-        if (statTotalRevenue) statTotalRevenue.textContent = totalRevenue.toLocaleString() + ' XAF';
+        document.getElementById('statTotalServices').textContent = totalServices;
+        document.getElementById('statTotalCreditsMoved').textContent = totalCreditsMoved;
+        document.getElementById('statTotalRevenue').textContent = totalRevenue.toLocaleString() + ' XAF';
         
         const servicesRankingEl = document.getElementById('servicesRanking');
         if (servicesRankingEl) {
@@ -771,7 +767,6 @@
         
         function cleanup() {
             overlay.style.display = 'none';
-            setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 300);
         }
         
         const roleSelect = document.getElementById('regRole');
@@ -860,9 +855,11 @@
                         lookupDone = true;
                         
                         if (result.success && result.found) {
+                            // ✅ Fermer le popup d'enregistrement
+                            overlay.style.display = 'none';
                             newBtn.disabled = false;
                             newBtn.textContent = 'Enregistrer';
-                            showAccountFoundPopup(result.user, phone, name, role, cleanup);
+                            showAccountFoundPopup(result.user, phone, name, role, overlay);
                             return;
                         }
                     } catch (e) {
@@ -909,7 +906,7 @@
     // POPUP COMPTE EXISTANT TROUVÉ
     // ============================================================
 
-    function showAccountFoundPopup(user, phone, name, role, cleanupFn) {
+    function showAccountFoundPopup(user, phone, name, role, registerOverlay) {
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
         overlay.setAttribute('role', 'dialog');
@@ -946,6 +943,10 @@
         
         overlay.querySelector('#cancelLinkAccount').addEventListener('click', async () => {
             closeLinkPopup();
+            // ✅ Réouvrir le popup d'enregistrement
+            if (registerOverlay) {
+                registerOverlay.style.display = 'flex';
+            }
             const submitBtn = document.getElementById('registerSubmit');
             if (submitBtn) {
                 submitBtn.disabled = true;
@@ -954,7 +955,7 @@
             try {
                 await CreditModule.createUserAfterRegistration(name, phone, role);
                 showToast('✅ Bienvenue ' + name + ' !');
-                if (cleanupFn) cleanupFn();
+                if (registerOverlay) registerOverlay.style.display = 'none';
                 updateCreditsDisplay();
             } catch (e) {
                 showToast('❌ Erreur : ' + e.message);
@@ -991,7 +992,7 @@
                 
                 if (otpResult.success) {
                     closeLinkPopup();
-                    showOTPVerificationPopup(phone, otpResult.otp || null, user, cleanupFn);
+                    showOTPVerificationPopup(phone, user, registerOverlay);
                 } else {
                     showToast('❌ Erreur envoi OTP : ' + (otpResult.error || 'Réessayez'));
                     confirmBtn.disabled = false;
@@ -1013,7 +1014,7 @@
     // POPUP VÉRIFICATION OTP
     // ============================================================
 
-    function showOTPVerificationPopup(phone, expectedOTP, user, cleanupFn) {
+    function showOTPVerificationPopup(phone, user, registerOverlay) {
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
         overlay.setAttribute('role', 'dialog');
@@ -1031,8 +1032,7 @@
                 </div>
                 <div class="popup-title">Vérification OTP</div>
                 <div class="popup-message">
-                    Un code à 6 chiffres a été envoyé au <strong>${phone}</strong>.
-                    ${expectedOTP ? `<br><br><small style="color: var(--text-muted);">Code de test : <strong>${expectedOTP}</strong></small>` : ''}
+                    Un code à 6 chiffres a été envoyé par SMS au <strong>${phone}</strong>.
                 </div>
                 <input type="text" class="popup-input" id="otpInput" placeholder="Entrez le code OTP" 
                        autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="6"
@@ -1053,7 +1053,6 @@
         const verifyBtn = overlay.querySelector('#verifyOTP');
         const cancelBtn = overlay.querySelector('#cancelOTP');
         const resendLink = overlay.querySelector('#resendOTP');
-        let currentOTP = expectedOTP;
         
         function closeOTPPopup() {
             if (overlay.parentNode) overlay.remove();
@@ -1125,7 +1124,6 @@
                         window.storage.set('credits', linkResult.credits);
                         window.storage.set('profile_completed', true);
                         
-                        const registerOverlay = document.getElementById('registerOverlay');
                         if (registerOverlay) {
                             registerOverlay.style.display = 'none';
                         }
@@ -1178,7 +1176,6 @@
             const otpResult = await otpResponse.json();
             
             if (otpResult.success) {
-                currentOTP = otpResult.otp || null;
                 showToast('📱 Nouveau code envoyé');
                 otpInput.value = '';
                 otpInput.focus();
