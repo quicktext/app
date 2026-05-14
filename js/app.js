@@ -1,6 +1,6 @@
 // QuickText Voice Pro - Application Principale
 // Version finale - Export PDF+TXT avec titre personnalisable
-// Avec authentification par mot de passe
+// Avec authentification par mot de passe - Correction changement de compte
 
 (function() {
     'use strict';
@@ -184,7 +184,7 @@
     }
 
     // ============================================================
-    // CHANGEMENT DE COMPTE
+    // CHANGEMENT DE COMPTE (sans suppression)
     // ============================================================
 
     async function switchToAccount(phone, password, currentOverlay) {
@@ -199,10 +199,10 @@
                         'apikey': CreditModule.config.anonKey,
                     },
                     body: JSON.stringify({
-                        action: 'link',
+                        action: 'switch',
                         phone: phone,
                         password: password,
-                        userId: CreditModule.userID,
+                        oldUserId: CreditModule.userID,
                     }),
                 }
             );
@@ -210,8 +210,8 @@
             const result = await response.json();
             
             if (result.success) {
-                window.storage.set('userID', result.userId);
-                CreditModule.userID = result.userId;
+                window.storage.set('userID', result.newUserId);
+                CreditModule.userID = result.newUserId;
                 CreditModule.currentCredits = result.credits;
                 window.storage.set('credits', result.credits);
                 window.storage.set('profile_completed', true);
@@ -327,7 +327,6 @@
         
         overlay.querySelector('#closeContactPopup').addEventListener('click', closeContact);
         
-        // Changer de compte
         overlay.querySelector('#showSwitchAccountContact').addEventListener('click', (e) => {
             e.preventDefault();
             overlay.querySelector('#switchAccountSectionContact').style.display = 'block';
@@ -351,7 +350,6 @@
             await switchToAccount(phone, password, overlay);
         });
         
-        // Changer le mot de passe
         overlay.querySelector('#showChangePasswordContact').addEventListener('click', (e) => {
             e.preventDefault();
             overlay.querySelector('#changePasswordSectionContact').style.display = 'block';
@@ -548,7 +546,6 @@
             }
         });
         
-        // Changer de compte
         overlay.querySelector('#showSwitchAccountAdmin').addEventListener('click', (e) => {
             e.preventDefault();
             overlay.querySelector('#switchAccountSectionAdmin').style.display = 'block';
