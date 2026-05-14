@@ -37,7 +37,7 @@
         toast.setAttribute('role', 'alert');
         toast.textContent = message;
         document.body.appendChild(toast);
-        const timer = setTimeout(() => { hideToast(toast); }, 2500);
+        const timer = setTimeout(() => { hideToast(toast); }, 4000);
         toast.addEventListener('click', () => { clearTimeout(timer); hideToast(toast); });
         return toast;
     }
@@ -224,7 +224,6 @@
                 showToast('✅ Connecté ! ' + result.credits + ' crédits disponibles.');
             } else {
                 showToast('❌ ' + (result.error || 'Erreur de connexion'));
-                // Vider le champ mot de passe
                 const passwordInput = document.querySelector('#switchPasswordContact, #switchPasswordAdmin');
                 if (passwordInput) {
                     passwordInput.value = '';
@@ -300,13 +299,22 @@
                     </a>
                     <button class="popup-btn popup-btn-cancel" id="closeContactPopup" style="flex: none; width: 100%;">Fermer</button>
                 </div>
-                <p style="margin-top: 12px; font-size: 0.75rem;">
+                <p style="margin-top: 16px; font-size: 0.75rem;">
                     <a href="#" id="showSwitchAccountContact" style="color: var(--text-muted); text-decoration: underline;">Changer de compte</a>
                 </p>
                 <div id="switchAccountSectionContact" style="display: none; margin-top: 12px;">
                     <input type="tel" class="popup-input" id="switchPhoneContact" placeholder="Numéro (ex: 696271312)" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
                     <input type="password" class="popup-input" id="switchPasswordContact" placeholder="Mot de passe" autocomplete="off">
                     <button class="popup-btn popup-btn-confirm" id="switchAccountBtnContact" style="width: 100%;">Se connecter</button>
+                </div>
+                <p style="margin-top: 16px; font-size: 0.75rem;">
+                    <a href="#" id="showChangePasswordContact" style="color: var(--text-muted); text-decoration: underline;">Changer mon mot de passe</a>
+                </p>
+                <div id="changePasswordSectionContact" style="display: none; margin-top: 12px;">
+                    <input type="tel" class="popup-input" id="changePhoneContact" placeholder="Votre numéro" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="9">
+                    <input type="password" class="popup-input" id="changeOldPasswordContact" placeholder="Ancien mot de passe" autocomplete="off">
+                    <input type="password" class="popup-input" id="changeNewPasswordContact" placeholder="Nouveau mot de passe" autocomplete="off" minlength="6">
+                    <button class="popup-btn popup-btn-confirm" id="changePasswordBtnContact" style="width: 100%;">Modifier</button>
                 </div>
             </div>
         `;
@@ -319,6 +327,7 @@
         
         overlay.querySelector('#closeContactPopup').addEventListener('click', closeContact);
         
+        // Changer de compte
         overlay.querySelector('#showSwitchAccountContact').addEventListener('click', (e) => {
             e.preventDefault();
             overlay.querySelector('#switchAccountSectionContact').style.display = 'block';
@@ -340,6 +349,101 @@
             }
             
             await switchToAccount(phone, password, overlay);
+        });
+        
+        // Changer le mot de passe
+        overlay.querySelector('#showChangePasswordContact').addEventListener('click', (e) => {
+            e.preventDefault();
+            overlay.querySelector('#changePasswordSectionContact').style.display = 'block';
+            setTimeout(() => overlay.querySelector('#changePhoneContact')?.focus(), 100);
+        });
+
+        overlay.querySelector('#changePasswordBtnContact').addEventListener('click', async () => {
+            const phone = overlay.querySelector('#changePhoneContact').value.trim();
+            const oldPassword = overlay.querySelector('#changeOldPasswordContact').value.trim();
+            const newPassword = overlay.querySelector('#changeNewPasswordContact').value.trim();
+            
+            if (!phone || !oldPassword || !newPassword) {
+                showToast('⚠️ Veuillez remplir tous les champs.');
+                return;
+            }
+            
+            if (!/^[67]\d{8}$/.test(phone)) {
+                showToast('📱 Numéro invalide.');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                showToast('🔒 Le nouveau mot de passe doit contenir au moins 6 caractères.');
+                return;
+            }
+            
+            const btn = overlay.querySelector('#changePasswordBtnContact');
+            btn.disabled = true;
+            btn.textContent = '⏳ Modification...';
+            
+            try {
+                const loginResponse = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/auth-user',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey,
+                        },
+                        body: JSON.stringify({
+                            action: 'login',
+                            phone: phone,
+                            password: oldPassword,
+                        }),
+                    }
+                );
+                
+                const loginResult = await loginResponse.json();
+                
+                if (!loginResult.success) {
+                    showToast('❌ ' + (loginResult.error || 'Numéro ou mot de passe incorrect'));
+                    btn.disabled = false;
+                    btn.textContent = 'Modifier';
+                    return;
+                }
+                
+                const changeResponse = await fetch(
+                    'https://zhvdyjpevrqteirqeztb.supabase.co/functions/v1/auth-user',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + CreditModule.config.anonKey,
+                            'apikey': CreditModule.config.anonKey,
+                        },
+                        body: JSON.stringify({
+                            action: 'change_password',
+                            userId: loginResult.user.user_id,
+                            oldPassword: oldPassword,
+                            newPassword: newPassword,
+                        }),
+                    }
+                );
+                
+                const changeResult = await changeResponse.json();
+                
+                if (changeResult.success) {
+                    showToast('✅ Mot de passe modifié avec succès !');
+                    overlay.querySelector('#changePasswordSectionContact').style.display = 'none';
+                    overlay.querySelector('#changePhoneContact').value = '';
+                    overlay.querySelector('#changeOldPasswordContact').value = '';
+                    overlay.querySelector('#changeNewPasswordContact').value = '';
+                } else {
+                    showToast('❌ ' + (changeResult.error || 'Erreur'));
+                }
+            } catch (e) {
+                showToast('Erreur réseau : ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Modifier';
+            }
         });
     }
 
@@ -818,7 +922,7 @@
     window.resetUserPassword = function(userId, userName) {
         showConfirmPopup(
             'Réinitialiser le mot de passe',
-            'Voulez-vous réinitialiser le mot de passe de "' + userName + '" ?\n\nLe nouveau mot de passe sera : QuickText2024',
+            'Voulez-vous réinitialiser le mot de passe de "' + userName + '" ?\n\nUn mot de passe aléatoire sera généré.',
             '<svg viewBox="0 0 24 24" fill="none" width="28" height="28"><rect x="3" y="11" width="18" height="11" rx="2" stroke="#f39c12" stroke-width="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="#f39c12" stroke-width="1.8" stroke-linecap="round"/></svg>',
             'Réinitialiser',
             async () => {
@@ -841,7 +945,7 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        showToast('✅ Mot de passe réinitialisé pour ' + userName);
+                        showToast('✅ Nouveau mot de passe : ' + result.password);
                     } else {
                         showToast('❌ ' + (result.error || 'Erreur'));
                     }
