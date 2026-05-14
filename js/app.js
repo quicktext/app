@@ -275,12 +275,31 @@
         overlay.style.zIndex = '35000';
         
         overlay.innerHTML = `
-            <div class="popup-dialog">
-                <button class="recharge-close-btn" id="closeContactPopup" style="position: absolute; top: 12px; right: 12px;" title="Fermer">
-                    <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <div class="popup-dialog" style="position: relative;">
+                <!-- Croix de fermeture - bien visible en haut à droite -->
+                <button id="closeContactPopup" style="
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    background: rgba(255, 255, 255, 0.08);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    color: #a0a0a0;
+                    transition: all 0.15s ease;
+                    padding: 0;
+                    z-index: 10;
+                " title="Fermer">
+                    <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
                     </svg>
                 </button>
+                
                 <div class="popup-icon">
                     <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
                         <rect x="5" y="2" width="14" height="20" rx="3" stroke="#b07cc6" stroke-width="1.8"/>
@@ -288,7 +307,7 @@
                     </svg>
                 </div>
                 <div class="popup-title">Service Client</div>
-                <div class="popup-message" style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
                     <strong style="font-size: 1.2rem; color: var(--accent-light);">620 99 46 46</strong>
                     <a href="https://wa.me/237620994646" target="_blank" rel="noopener" 
                     style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; 
@@ -325,19 +344,35 @@
             if (overlay.parentNode) overlay.remove();
         }
         
-        overlay.querySelector('#closeContactPopup').addEventListener('click', (e) => {
-            e.stopPropagation();
-            closeContact();
-        });
+        // ✅ Fermer avec la croix
+        const closeBtn = overlay.querySelector('#closeContactPopup');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeContact();
+            });
+            
+            // Effet hover pour le bouton fermer
+            closeBtn.addEventListener('mouseenter', () => {
+                closeBtn.style.background = 'rgba(231, 76, 60, 0.3)';
+                closeBtn.style.color = '#f08080';
+                closeBtn.style.borderColor = 'rgba(231, 76, 60, 0.5)';
+            });
+            closeBtn.addEventListener('mouseleave', () => {
+                closeBtn.style.background = 'rgba(255, 255, 255, 0.08)';
+                closeBtn.style.color = '#a0a0a0';
+                closeBtn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            });
+        }
         
         // Changer de compte
-        overlay.querySelector('#showSwitchAccountContact').addEventListener('click', (e) => {
+        overlay.querySelector('#showSwitchAccountContact')?.addEventListener('click', (e) => {
             e.preventDefault();
             overlay.querySelector('#switchAccountSectionContact').style.display = 'block';
             setTimeout(() => overlay.querySelector('#switchPhoneContact')?.focus(), 100);
         });
         
-        overlay.querySelector('#switchAccountBtnContact').addEventListener('click', async () => {
+        overlay.querySelector('#switchAccountBtnContact')?.addEventListener('click', async () => {
             const phone = overlay.querySelector('#switchPhoneContact').value.trim();
             const password = overlay.querySelector('#switchPasswordContact').value.trim();
             
@@ -355,13 +390,13 @@
         });
         
         // Changer le mot de passe
-        overlay.querySelector('#showChangePasswordContact').addEventListener('click', (e) => {
+        overlay.querySelector('#showChangePasswordContact')?.addEventListener('click', (e) => {
             e.preventDefault();
             overlay.querySelector('#changePasswordSectionContact').style.display = 'block';
             setTimeout(() => overlay.querySelector('#changePhoneContact')?.focus(), 100);
         });
 
-        overlay.querySelector('#changePasswordBtnContact').addEventListener('click', async () => {
+        overlay.querySelector('#changePasswordBtnContact')?.addEventListener('click', async () => {
             const phone = overlay.querySelector('#changePhoneContact').value.trim();
             const oldPassword = overlay.querySelector('#changeOldPasswordContact').value.trim();
             const newPassword = overlay.querySelector('#changeNewPasswordContact').value.trim();
@@ -459,6 +494,11 @@
         
         overlay.innerHTML = `
             <div class="popup-dialog">
+                <button id="closeContactPopup" class="recharge-close-btn" title="Fermer" style="position: absolute; top: 12px; right: 12px;">
+                    <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
                 <div class="popup-icon">
                     <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
                         <rect x="3" y="11" width="18" height="11" rx="2" stroke="#b07cc6" stroke-width="1.8"/>
